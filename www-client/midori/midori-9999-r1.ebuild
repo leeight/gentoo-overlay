@@ -6,7 +6,7 @@ inherit git eutils
 
 DESCRIPTION="A lightweight web browser"
 HOMEPAGE="http://www.twotoasts.de/index.php?/pages/midori_summary.html"
-EGIT_REPO_URI="git://git.xfce.org/kalikiana/midori"
+EGIT_REPO_URI="git://git.xfce.org/apps/midori"
 EGIT_PROJECT="midori"
 
 LICENSE="GPL-2"
