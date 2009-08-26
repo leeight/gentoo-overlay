@@ -13,7 +13,7 @@ SRC_URI="mirror://sourceforge/freetype/${P/_/}.tar.bz2
 LICENSE="FTL GPL-2"
 SLOT="2"
 KEYWORDS="alpha amd64 arm hppa ia64 m68k ~mips ppc ppc64 s390 sh sparc ~sparc-fbsd x86 ~x86-fbsd"
-IUSE="X bindist debug doc utils fontforge"
+IUSE="X bindist debug doc utils ubuntu fontforge"
 
 DEPEND="X?	( x11-libs/libX11
 			  x11-libs/libXau
@@ -59,12 +59,14 @@ src_unpack() {
 	enable_option FT_CONFIG_OPTION_INCREMENTAL
 	disable_option FT_CONFIG_OPTION_OLD_INTERNALS
 
+	if use ubuntu; then
 	#Ubuntu patch
-	epatch "${FILESDIR}"/${PN}-ubuntu-01_backwards_compat.patch
-	epatch "${FILESDIR}"/${PN}-ubuntu-02_bdflib_large_encodings.patch
-	epatch "${FILESDIR}"/${PN}-ubuntu-03_hmtx_no_shorts.patch
-	epatch "${FILESDIR}"/${PN}-ubuntu-04_proper_armel_asm_declaration.patch
-	epatch "${FILESDIR}"/enable-subpixel-rendering.patch
+		epatch "${FILESDIR}"/${PN}-ubuntu-01_backwards_compat.patch
+		epatch "${FILESDIR}"/${PN}-ubuntu-02_bdflib_large_encodings.patch
+		epatch "${FILESDIR}"/${PN}-ubuntu-03_hmtx_no_shorts.patch
+		epatch "${FILESDIR}"/${PN}-ubuntu-04_proper_armel_asm_declaration.patch
+		epatch "${FILESDIR}"/enable-subpixel-rendering.patch
+	fi
 
 	epatch "${FILESDIR}"/${PN}-2.3.2-enable-valid.patch
 	epatch "${FILESDIR}"/${P}-CVE-2009-0946.patch            # 263032
