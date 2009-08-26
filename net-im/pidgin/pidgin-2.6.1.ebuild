@@ -153,6 +153,7 @@ src_configure() {
 		$(use_with zephyr krb4) \
 		$(use_enable bonjour avahi) \
 		"--with-dynamic-prpls=${DYNAMIC_PRPLS}" \
+		--enable-vv \
 		--disable-mono \
 		--x-includes=/usr/include/X11 \
 		${myconf} || die "Configuration failed"
