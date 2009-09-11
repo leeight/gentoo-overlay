@@ -1,0 +1,31 @@
+--- usr/src/nv/os-agp.c.orig	2009-06-22 15:54:48.000000000 +0200
++++ usr/src/nv/os-agp.c	2009-06-22 15:40:13.000000000 +0200
+@@ -293,7 +293,7 @@ RM_STATUS KernLoadAGPPages(
+     {
+          nv_pte_t *page_ptr = at->page_table[i];
+ 
+-         page_ptr->phys_addr = (ptr->memory[i] & PAGE_MASK);
++         page_ptr->phys_addr = (page_to_phys(ptr->pages[i]) & PAGE_MASK);
+          page_ptr->virt_addr = (unsigned long) __va(page_ptr->phys_addr);
+          page_ptr->dma_addr  = page_ptr->phys_addr;
+     }
+--- usr/src/nv/nv-i2c.c.orig	2009-06-22 16:21:57.000000000 +0200
++++ usr/src/nv/nv-i2c.c	2009-06-22 16:24:12.000000000 +0200
+@@ -218,8 +218,6 @@ struct i2c_adapter nv_i2c_adapter_protot
+ #if defined(NV_I2C_ADAPTER_HAS_DEC_USE)
+     .dec_use           = nv_i2c_adapter_dec_use,
+ #endif
+-    .client_register   = nv_i2c_adapter_register_client,
+-    .client_unregister = nv_i2c_adapter_unregister_client,
+     .data              = NULL,
+ };
+ 
+@@ -241,8 +239,6 @@ struct i2c_adapter nv_i2c_adapter_protot
+     .owner             = THIS_MODULE,
+     .algo              = &nv_i2c_algo,
+     .algo_data         = NULL,
+-    .client_register   = nv_i2c_adapter_register_client,
+-    .client_unregister = nv_i2c_adapter_unregister_client,
+ };
+ 
+ #endif // defined(KERNEL_2_4)

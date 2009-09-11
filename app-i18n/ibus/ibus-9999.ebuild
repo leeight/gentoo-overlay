@@ -16,8 +16,9 @@ SRC_URI=""
 
 LICENSE="LGPL-2.1"
 SLOT="0"
-KEYWORDS=""
+KEYWORDS="~amd64 ~x86"
 IUSE="nls qt4 doc test"
+FEATURES="nostrip"
 
 COMMOM_DEPEND=">=dev-libs/glib-2.18
 	dev-libs/dbus-glib
