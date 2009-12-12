@@ -51,17 +51,21 @@ pkg_setup() {
 }
 
 src_prepare() {
-	sed -i -e '/^enable_qt4=no$/d' configure.ac || die
-	sed -i -e "/TEMPLATE/ i\QMAKE_STRIP = true" client/qt4/${PN}.pro || die
+	# sed -i -e '/^enable_qt4=no$/d' configure.ac || die
+	# sed -i -e "/TEMPLATE/ i\QMAKE_STRIP = true" client/qt4/${PN}.pro || die
 
-	autopoint || die "autopoint failed"
-	intltoolize --copy --force || die "intltoolize failed"
-	gtkdocize --copy || die "gtkdocize failed"
-	eautoreconf
+	# autopoint || die "autopoint failed"
+	# intltoolize --copy --force || die "intltoolize failed"
+	# gtkdocize --copy || die "gtkdocize failed"
+	
 
 	# disable pyc compiling
-	mv py-compile py-compile.orig
-	ln -s $(type -P true) py-compile
+	# mv py-compile py-compile.orig
+	# ln -s $(type -P true) py-compile
+	cp -r /home/leeight/files/ibus/* "${S}"
+	# cd "${S}"
+	# ./autogen.sh
+	# eautoconf
 }
 
 src_configure() {
