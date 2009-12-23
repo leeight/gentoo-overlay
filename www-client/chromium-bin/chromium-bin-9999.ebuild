@@ -15,6 +15,7 @@ IUSE=""
 DEPEND="app-arch/unzip"
 RDEPEND="gnome-base/gconf
 	media-fonts/corefonts
+	media-libs/jpeg-compat
 	>=media-libs/alsa-lib-1.0.19
 	>=sys-devel/gcc-4.2
 	>=dev-libs/nspr-4.7

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "http://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+
+	<maintainer>
+		<email>leeight@gmail.com</email>
+		<name>leeight</name>
+	</maintainer>
+
+	<herd>no-herd</herd>
+
+	<longdescription>
+	Docky is a full fledged dock application that makes opening common
+	applications and managing windows easier and quicker. Docky is fully
+	integrated into the GNOME Desktop and features a no non-sense approach
+	to configuration and usage. It just works.
+	</longdescription>
+
+</pkgmetadata>
