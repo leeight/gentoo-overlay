@@ -1,0 +1,89 @@
+Only in gperf-3.0.4: config.log
+Only in gperf-3.0.4: config.status
+Only in gperf-3.0.4/doc: config.status
+Only in gperf-3.0.4/doc: Makefile
+Only in gperf-3.0.4/lib: config.log
+Only in gperf-3.0.4/lib: config.status
+Only in gperf-3.0.4/lib: Makefile
+Only in gperf-3.0.4: Makefile
+Only in gperf-3.0.4/src: config.h
+Only in gperf-3.0.4/src: config.log
+Only in gperf-3.0.4/src: config.status
+Only in gperf-3.0.4/src: Makefile
+diff -rup gperf-3.0.4.orig/src/options.cc gperf-3.0.4/src/options.cc
+--- gperf-3.0.4.orig/src/options.cc	2009-02-01 21:48:49.000000000 +0800
++++ gperf-3.0.4/src/options.cc	2010-03-31 17:31:11.000000000 +0800
+@@ -239,6 +239,8 @@ Options::long_usage (FILE * stream)
+            "  -r, --random           Utilizes randomness to initialize the associated\n"
+            "                         values table.\n");
+   fprintf (stream,
++           "  -X --disable-inline    disable inline functions\n");
++  fprintf (stream,
+            "  -s, --size-multiple=N  Affects the size of the generated hash table. The\n"
+            "                         numeric argument N indicates \"how many times larger\n"
+            "                         or smaller\" the associated value range should be,\n"
+@@ -710,6 +712,7 @@ static const struct option long_options[
+   { "help", no_argument, NULL, 'h' },
+   { "version", no_argument, NULL, 'v' },
+   { "debug", no_argument, NULL, 'd' },
++  { "disable-inline", no_argument, NULL, 'X' },
+   { NULL, no_argument, NULL, 0 }
+ };
+ 
+@@ -724,7 +727,7 @@ Options::parse_options (int argc, char *
+ 
+   while ((option_char =
+             getopt_long (_argument_count, _argument_vector,
+-                         "acCdDe:Ef:F:gGhH:i:Ij:k:K:lL:m:nN:oOpPQ:rs:S:tTvW:Z:7",
++                         "acCdDe:Ef:F:gGhH:i:Ij:k:K:lL:m:nN:oOpPXQ:rs:S:tTvW:Z:7",
+                          long_options, NULL))
+          != -1)
+     {
+@@ -749,6 +752,11 @@ Options::parse_options (int argc, char *
+                              program_name, version_string);
+             break;
+           }
++        case 'X':
++          {
++            _option_word |= NO_INLINE;
++            break;
++          }
+         case 'D':               /* Enable duplicate option.  */
+           {
+             _option_word |= DUP;
+diff -rup gperf-3.0.4.orig/src/options.h gperf-3.0.4/src/options.h
+--- gperf-3.0.4.orig/src/options.h	2008-08-24 02:52:48.000000000 +0800
++++ gperf-3.0.4/src/options.h	2010-03-31 17:24:13.000000000 +0800
+@@ -109,7 +109,9 @@ enum Option_Type
+   /* --- Informative output --- */
+ 
+   /* Enable debugging (prints diagnostics to stderr).  */
+-  DEBUG        = 1 << 21
++  DEBUG        = 1 << 21,
++
++  NO_INLINE    = 1 << 22
+ };
+ 
+ /* Class manager for gperf program Options.  */
+diff -rup gperf-3.0.4.orig/src/output.cc gperf-3.0.4/src/output.cc
+--- gperf-3.0.4.orig/src/output.cc	2009-01-19 17:50:07.000000000 +0800
++++ gperf-3.0.4/src/output.cc	2010-03-31 17:35:07.000000000 +0800
+@@ -745,6 +745,7 @@ Output::output_hash_function () const
+   if (option[CPLUSPLUS])
+     printf ("inline ");
+   else if (option[KRC] | option[C] | option[ANSIC])
++    if(!option[NO_INLINE])
+     printf ("#ifdef __GNUC__\n"
+             "__inline\n"
+             "#else\n"
+@@ -1892,6 +1893,7 @@ Output::output_lookup_function () const
+          warning: C99 inline functions are not supported; using GNU89
+          warning: to disable this warning use -fgnu89-inline or the gnu_inline function attribute
+        It defines a macro __GNUC_GNU_INLINE__ to indicate this situation.  */
++    if(!option[NO_INLINE])
+     printf ("#ifdef __GNUC__\n"
+             "__inline\n"
+             "#if defined __GNUC_STDC_INLINE__ || defined __GNUC_GNU_INLINE__\n"
+Only in gperf-3.0.4/tests: config.log
+Only in gperf-3.0.4/tests: config.status
+Only in gperf-3.0.4/tests: Makefile

@@ -1,0 +1,33 @@
+diff --git a/WebCore/html/HTMLTokenizer.cpp b/WebCore/html/HTMLTokenizer.cpp
+index 1a2d276..7112f00 100644
+--- a/WebCore/html/HTMLTokenizer.cpp
++++ b/WebCore/html/HTMLTokenizer.cpp
+@@ -54,7 +54,9 @@
+ #include <wtf/ASCIICType.h>
+ #include <wtf/CurrentTime.h>
+ 
+-#include "HTMLEntityNames.c"
++extern "C" {
++  #include "HTMLEntityNames.c"
++}
+ 
+ #define PRELOAD_SCANNER_ENABLED 1
+ // #define INSTRUMENT_LAYOUT_SCHEDULING 1
+diff --git a/WebCore/html/PreloadScanner.cpp b/WebCore/html/PreloadScanner.cpp
+index 60e538e..a7e027b 100644
+--- a/WebCore/html/PreloadScanner.cpp
++++ b/WebCore/html/PreloadScanner.cpp
+@@ -47,7 +47,9 @@
+ // Use __GNUC__ instead of PLATFORM(GCC) to stay consistent with the gperf generated c file
+ #ifdef __GNUC__
+ // The main tokenizer includes this too so we are getting two copies of the data. However, this way the code gets inlined.
+-#include "HTMLEntityNames.c"
++extern "C" {
++  #include "HTMLEntityNames.c"
++}
+ #else
+ // Not inlined for non-GCC compilers
+ struct Entity {
+-- 
+1.6.5.rc2
+

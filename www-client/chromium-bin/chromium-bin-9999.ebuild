@@ -64,8 +64,8 @@ src_install() {
 
 	# Create symlinks for needed libraries
 	dodir ${CHROMIUM_HOME}/nss-nspr
-	NSS_DIR=/usr/$(get_libdir)/nss
-	NSPR_DIR=/usr/$(get_libdir)/nspr
+	NSS_DIR=/usr/$(get_libdir)
+	NSPR_DIR=/usr/$(get_libdir)
 
 	dosym ${NSPR_DIR}/libnspr4.so ${CHROMIUM_HOME}/nss-nspr/libnspr4.so.0d
 	dosym ${NSPR_DIR}/libplc4.so ${CHROMIUM_HOME}/nss-nspr/libplc4.so.0d

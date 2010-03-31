@@ -1,0 +1,92 @@
+diff -rup webkit-1.1.90.orig/GNUmakefile.in webkit-1.1.90/GNUmakefile.in
+--- webkit-1.1.90.orig/GNUmakefile.in	2010-03-31 20:31:04.000000000 +0800
++++ webkit-1.1.90/GNUmakefile.in	2010-03-31 19:26:57.000000000 +0800
+@@ -32077,16 +32077,16 @@ DerivedSources/CSSValueKeywords.h : $(WE
+ 
+ # DOCTYPE strings
+ DerivedSources/DocTypeStrings.cpp : $(WebCore)/html/DocTypeStrings.gperf
+-	$(AM_V_GEN)$(GPERF) -CEot -I -L ANSI-C -k "*" -N findDoctypeEntry -F ,PubIDInfo::eAlmostStandards,PubIDInfo::eAlmostStandards $(WebCore)/html/DocTypeStrings.gperf > $@
++	$(AM_V_GEN)$(GPERF) --disable-inline -CEot -I -L ANSI-C -k "*" -N findDoctypeEntry -F ,PubIDInfo::eAlmostStandards,PubIDInfo::eAlmostStandards $(WebCore)/html/DocTypeStrings.gperf > $@
+ 
+ # HTML entity names
+ DerivedSources/HTMLEntityNames.c : $(WebCore)/html/HTMLEntityNames.gperf
+-	$(AM_V_GEN)$(GPERF) -a -I -L ANSI-C -C -G -c -o -t -k '*' -N findEntity -D -s 2 \
++	$(AM_V_GEN)$(GPERF) --disable-inline -a -I -L ANSI-C -C -G -c -o -t -k '*' -N findEntity -D -s 2 \
+ 	$(WebCore)/html/HTMLEntityNames.gperf > $@
+ 
+ # color names
+ DerivedSources/ColorData.c: $(WebCore)/platform/ColorData.gperf
+-	$(AM_V_GEN)$(GPERF) -CDEot -L ANSI-C -k '*' -N findColor -D -s 2 $< > $@
++	$(AM_V_GEN)$(GPERF) --disable-inline -CDEot -L ANSI-C -k '*' -N findColor -D -s 2 $< > $@
+ 
+ # CSS tokenizer
+ DerivedSources/tokenizer.cpp : $(WebCore)/css/tokenizer.flex $(WebCore)/css/maketokenizer
+diff -rup webkit-1.1.90.orig/WebCore/css/makeprop.pl webkit-1.1.90/WebCore/css/makeprop.pl
+--- webkit-1.1.90.orig/WebCore/css/makeprop.pl	2010-03-31 20:31:04.000000000 +0800
++++ webkit-1.1.90/WebCore/css/makeprop.pl	2010-03-31 19:27:22.000000000 +0800
+@@ -93,7 +93,7 @@ EOF
+ 
+ close HEADER;
+ 
+-system("gperf -a -L ANSI-C -E -C -c -o -t --key-positions=\"*\" -NfindProp -Hhash_prop -Wwordlist_prop -D -s 2 CSSPropertyNames.gperf > CSSPropertyNames.cpp") == 0 || die "calling gperf failed: $?";
++system("gperf --disable-inline -a -L ANSI-C -E -C -c -o -t --key-positions=\"*\" -NfindProp -Hhash_prop -Wwordlist_prop -D -s 2 CSSPropertyNames.gperf > CSSPropertyNames.cpp") == 0 || die "calling gperf failed: $?";
+ 
+ open C, ">>CSSPropertyNames.cpp" || die "Could not open CSSPropertyNames.cpp for writing";
+ print C "static const char * const propertyNameStrings[$num] = {\n";
+diff -rup webkit-1.1.90.orig/WebCore/css/makevalues.pl webkit-1.1.90/WebCore/css/makevalues.pl
+--- webkit-1.1.90.orig/WebCore/css/makevalues.pl	2010-03-31 20:31:04.000000000 +0800
++++ webkit-1.1.90/WebCore/css/makevalues.pl	2010-03-31 19:27:33.000000000 +0800
+@@ -86,7 +86,7 @@ const char* getValueName(unsigned short
+ EOF
+ close HEADER;
+ 
+-system("gperf -L ANSI-C -E -C -n -o -t --key-positions=\"*\" -NfindValue -Hhash_val -Wwordlist_value -D CSSValueKeywords.gperf > CSSValueKeywords.c") == 0 || die "calling gperf failed: $?";
++system("gperf --disable-inline -L ANSI-C -E -C -n -o -t --key-positions=\"*\" -NfindValue -Hhash_val -Wwordlist_value -D CSSValueKeywords.gperf > CSSValueKeywords.c") == 0 || die "calling gperf failed: $?";
+ 
+ open C, ">>CSSValueKeywords.c" || die "Could not open CSSValueKeywords.c for writing";
+ print C  "static const char * const valueList[] = {\n";
+diff -rup webkit-1.1.90.orig/WebCore/GNUmakefile.am webkit-1.1.90/WebCore/GNUmakefile.am
+--- webkit-1.1.90.orig/WebCore/GNUmakefile.am	2010-03-17 01:31:59.000000000 +0800
++++ webkit-1.1.90/WebCore/GNUmakefile.am	2010-03-31 20:30:47.000000000 +0800
+@@ -3565,16 +3565,16 @@ DerivedSources/CSSValueKeywords.h : $(WE
+ 
+ # DOCTYPE strings
+ DerivedSources/DocTypeStrings.cpp : $(WebCore)/html/DocTypeStrings.gperf
+-	$(AM_V_GEN)$(GPERF) -CEot -I -L ANSI-C -k "*" -N findDoctypeEntry -F ,PubIDInfo::eAlmostStandards,PubIDInfo::eAlmostStandards $(WebCore)/html/DocTypeStrings.gperf > $@
++	$(AM_V_GEN)$(GPERF) --disable-inline -CEot -I -L ANSI-C -k "*" -N findDoctypeEntry -F ,PubIDInfo::eAlmostStandards,PubIDInfo::eAlmostStandards $(WebCore)/html/DocTypeStrings.gperf > $@
+ 
+ # HTML entity names
+ DerivedSources/HTMLEntityNames.c : $(WebCore)/html/HTMLEntityNames.gperf
+-	$(AM_V_GEN)$(GPERF) -a -I -L ANSI-C -C -G -c -o -t -k '*' -N findEntity -D -s 2 \
++	$(AM_V_GEN)$(GPERF) --disable-inline -a -I -L ANSI-C -C -G -c -o -t -k '*' -N findEntity -D -s 2 \
+ 	$(WebCore)/html/HTMLEntityNames.gperf > $@
+ 
+ # color names
+ DerivedSources/ColorData.c: $(WebCore)/platform/ColorData.gperf
+-	$(AM_V_GEN)$(GPERF) -CDEot -L ANSI-C -k '*' -N findColor -D -s 2 $< > $@
++	$(AM_V_GEN)$(GPERF) --disable-inline -CDEot -L ANSI-C -k '*' -N findColor -D -s 2 $< > $@
+ 
+ # CSS tokenizer
+ DerivedSources/tokenizer.cpp : $(WebCore)/css/tokenizer.flex $(WebCore)/css/maketokenizer
+diff -rup webkit-1.1.90.orig/WebCore/html/PreloadScanner.cpp webkit-1.1.90/WebCore/html/PreloadScanner.cpp
+--- webkit-1.1.90.orig/WebCore/html/PreloadScanner.cpp	2010-03-31 20:31:04.000000000 +0800
++++ webkit-1.1.90/WebCore/html/PreloadScanner.cpp	2010-03-31 19:28:14.000000000 +0800
+@@ -44,18 +44,12 @@
+ #include <wtf/CurrentTime.h>
+ #include <wtf/unicode/Unicode.h>
+ 
+-// Use __GNUC__ instead of PLATFORM(GCC) to stay consistent with the gperf generated c file
+-#ifdef __GNUC__
+-// The main tokenizer includes this too so we are getting two copies of the data. However, this way the code gets inlined.
+-#include "HTMLEntityNames.c"
+-#else
+ // Not inlined for non-GCC compilers
+ struct Entity {
+     const char* name;
+     int code;
+ };
+ const struct Entity* findEntity(register const char* str, register unsigned int len);
+-#endif
+ 
+ #define PRELOAD_DEBUG 0
+ 

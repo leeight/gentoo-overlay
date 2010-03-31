@@ -1,0 +1,47 @@
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/1173/trunk/media-plugins/osd-lyrics
+END
+metadata.xml
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/!svn/ver/1072/trunk/media-plugins/osd-lyrics/metadata.xml
+END
+osd-lyrics-0.2.20080828-r1.ebuild
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/!svn/ver/1023/trunk/media-plugins/osd-lyrics/osd-lyrics-0.2.20080828-r1.ebuild
+END
+Manifest
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/!svn/ver/1173/trunk/media-plugins/osd-lyrics/Manifest
+END
+ChangeLog
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/!svn/ver/1023/trunk/media-plugins/osd-lyrics/ChangeLog
+END
+osd-lyrics-9999.ebuild
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/!svn/ver/1023/trunk/media-plugins/osd-lyrics/osd-lyrics-9999.ebuild
+END
+osd-lyrics-0.2.20091227.ebuild
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/!svn/ver/1153/trunk/media-plugins/osd-lyrics/osd-lyrics-0.2.20091227.ebuild
+END
+osd-lyrics-0.3.20100211.ebuild
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/!svn/ver/1173/trunk/media-plugins/osd-lyrics/osd-lyrics-0.3.20100211.ebuild
+END
