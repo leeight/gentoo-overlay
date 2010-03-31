@@ -4,7 +4,7 @@
 
 EAPI="2"
 
-inherit autotools versionator
+inherit eutils autotools versionator
 
 MY_PN="${PN/-/}"
 MY_P="${MY_PN}-${PV}"
@@ -28,12 +28,16 @@ DEPEND="${RDEPEND}"
 
 S=${WORKDIR}/${MY_P}
 
-src_prepare() {
-	eautoreconf
+src_prepare(){
+	epatch "${FILESDIR}/osdlyrics-libtool-tag.patch"
 }
 
 src_configure() {
-	use mpd || econf --disable-mpd --disable-xmms2
+	local myconf
+
+	use mpd || myconf="${myconf} --disable-mpd --disable-xmms2"
+
+	econf ${myconf}
 }
 
 src_install() {

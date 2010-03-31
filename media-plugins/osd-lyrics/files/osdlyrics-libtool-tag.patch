@@ -1,0 +1,31 @@
+diff -rup osdlyrics-0.3.20100330.orig/lib/chardetect/Makefile osdlyrics-0.3.20100330/lib/chardetect/Makefile
+--- osdlyrics-0.3.20100330.orig/lib/chardetect/Makefile	2010-03-25 11:11:09.000000000 +0800
++++ osdlyrics-0.3.20100330/lib/chardetect/Makefile	2010-03-31 21:09:35.000000000 +0800
+@@ -17,7 +17,7 @@ $(TARGET):
+ 	    $(MAKE) -C $$mdir ; \
+ 	  fi; \
+ 	done
+-	libtool --mode=compile $(CXX) $(CXXFLAGS) src/entry/impl.cpp
++	libtool --tag=CC --mode=compile $(CXX) $(CXXFLAGS) src/entry/impl.cpp
+ 	libtool --tag=CC --mode=link gcc -O2 -o $(TARGET) \
+ 		impl.lo src/*.lo \
+ 	        -avoid-version -module \
+@@ -41,4 +41,4 @@ clean:
+ 
+ check: all
+ 
+-install: 
+\ No newline at end of file
++install: 
+diff -rup osdlyrics-0.3.20100330.orig/lib/chardetect/src/Makefile osdlyrics-0.3.20100330/lib/chardetect/src/Makefile
+--- osdlyrics-0.3.20100330.orig/lib/chardetect/src/Makefile	2010-03-25 10:47:25.000000000 +0800
++++ osdlyrics-0.3.20100330/lib/chardetect/src/Makefile	2010-03-31 21:09:53.000000000 +0800
+@@ -40,7 +40,7 @@ OBJS=$(SRCS:%.cpp=%.o)
+ all: $(OBJS)
+ 
+ $(OBJS): %.o: %.cpp
+-	libtool --mode=compile $(CXX) $(CXXFLAGS) $<
++	libtool --tag=CC --mode=compile $(CXX) $(CXXFLAGS) $<
+ 
+ clean:
+ 	rm -f *.o
