@@ -31,6 +31,7 @@ src_unpack() {
 	sed -i '/^SUBDIRS/s/locate//' Makefile.in
 
 	use selinux && epatch "${FILESDIR}/${SELINUX_PATCH}"
+	epatch "${FILESDIR}/${P}-fts-assert.patch"
 }
 
 src_compile() {
