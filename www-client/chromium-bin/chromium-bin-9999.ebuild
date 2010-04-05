@@ -1,27 +1,42 @@
-# Copyright 1999-2009 Gentoo Foundation
+# Copyright 1999-2010 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
-# $Header: /var/cvsroot/gentoo-x86/www-client/chromium-bin/chromium-bin-9999.ebuild,v 1.25 2009/12/01 15:59:21 voyageur Exp $
+# $Header: /var/cvsroot/gentoo-x86/www-client/chromium-bin/chromium-bin-9999.ebuild,v 1.38 2010/03/19 17:18:54 phajdan.jr Exp $
 
 EAPI="2"
-inherit eutils multilib
+inherit eutils multilib portability
 
 DESCRIPTION="Open-source version of Google Chrome web browser (binary version)"
 HOMEPAGE="http://code.google.com/chromium/"
 LICENSE="GPL-2"
 SLOT="0"
 KEYWORDS="~x86"
-IUSE=""
+IUSE="+plugins-symlink"
 
 DEPEND="app-arch/unzip"
-RDEPEND="gnome-base/gconf
-	media-fonts/corefonts
-	media-libs/jpeg-compat
+RDEPEND="app-arch/bzip2
+	gnome-base/gconf
 	>=media-libs/alsa-lib-1.0.19
+	<media-libs/jpeg-7
+	=media-libs/libpng-1.2*
 	>=sys-devel/gcc-4.2
 	>=dev-libs/nspr-4.7
 	>=dev-libs/nss-3.12.3
-	x11-libs/pango
-	x11-themes/gnome-icon-theme"
+	sys-libs/zlib
+	>=x11-libs/gtk+-2.14.7
+	x11-libs/libXScrnSaver
+	x11-misc/xdg-utils
+	|| (
+		x11-themes/gnome-icon-theme
+		x11-themes/tango-icon-theme
+		x11-themes/xfce4-icon-theme
+	)"
+
+# Incompatible system plugins:
+# www-plugins/gecko-mediaplayer, bug #309231.
+RDEPEND+="
+	plugins-symlink? (
+		!www-plugins/gecko-mediaplayer[gnome]
+	)"
 
 S=${WORKDIR}
 
@@ -32,9 +47,26 @@ QA_TEXTRELS="opt/chromium.org/chrome-linux/libffmpegsumo.so"
 QA_PRESTRIPPED="opt/chromium.org/chrome-linux/libffmpegsumo.so"
 
 pkg_setup() {
-	# Built with SSE2 enabled, so will fail on older processors
-	if [[ ${ROOT} == "/" ]] && ! grep -q sse2 /proc/cpuinfo; then
-		die "This binary requires SSE2 support, it will not work on older processors"
+	if [[ "${ROOT}" == "/" ]]; then
+		# Built with SSE2 enabled, so will fail on older processors
+		if ! grep -q sse2 /proc/cpuinfo; then
+			die "This binary requires SSE2 support, it will not work on older processors"
+		fi
+
+		# Prevent user problems like bug 299777.
+		if ! grep -q /dev/shm <<< $(get_mounts); then
+			eerror "You don't have tmpfs mounted at /dev/shm."
+			eerror "${PN} isn't going to work in that configuration."
+			eerror "Please uncomment the /dev/shm entry in /etc/fstab,"
+			eerror "run 'mount /dev/shm' and try again."
+			die "/dev/shm is not mounted"
+		fi
+		if [ `stat -c %a /dev/shm` -ne 1777 ]; then
+			eerror "/dev/shm does not have correct permissions."
+			eerror "${PN} isn't going to work in that configuration."
+			eerror "Please run chmod 1777 /dev/shm and try again."
+			die "/dev/shm has incorrect permissions"
+		fi
 	fi
 }
 
@@ -56,16 +88,26 @@ src_install() {
 	cp -R chrome-linux/ "${D}"${CHROMIUM_HOME} || die "Unable to install chrome-linux folder"
 
 	# Man page (rename to prevent collision with chromium)
-	newman chrome-linux/chromium-browser.1 chromium-bin.1
-	rm "${D}"${CHROMIUM_HOME}/chrome-linux/chromium-browser.1
+	newman chrome-linux/chrome.1 chromium-bin.1
+	rm "${D}"${CHROMIUM_HOME}/chrome-linux/chrome.1
 
-	# Plugins symlink
-	dosym /usr/$(get_libdir)/nsbrowser/plugins ${CHROMIUM_HOME}/chrome-linux/plugins
+	# Plugins symlink, optional wrt bug #301911
+	if use plugins-symlink; then
+		dosym /usr/$(get_libdir)/nsbrowser/plugins ${CHROMIUM_HOME}/chrome-linux/plugins
+	fi
 
 	# Create symlinks for needed libraries
 	dodir ${CHROMIUM_HOME}/nss-nspr
-	NSS_DIR=/usr/$(get_libdir)
-	NSPR_DIR=/usr/$(get_libdir)
+	if has_version ">=dev-libs/nss-3.12.5-r1"; then
+		NSS_DIR=/usr/$(get_libdir)
+	else
+		NSS_DIR=/usr/$(get_libdir)/nss
+	fi
+	if has_version ">=dev-libs/nspr-4.8.3-r2"; then
+		NSPR_DIR=/usr/$(get_libdir)
+	else
+		NSPR_DIR=/usr/$(get_libdir)/nspr
+	fi
 
 	dosym ${NSPR_DIR}/libnspr4.so ${CHROMIUM_HOME}/nss-nspr/libnspr4.so.0d
 	dosym ${NSPR_DIR}/libplc4.so ${CHROMIUM_HOME}/nss-nspr/libplc4.so.0d
@@ -78,7 +120,7 @@ src_install() {
 	# Create chromium-bin wrapper
 	make_wrapper chromium-bin ./chrome ${CHROMIUM_HOME}/chrome-linux ${CHROMIUM_HOME}/nss-nspr:${CHROMIUM_HOME}/chrome-linux
 	newicon "${FILESDIR}"/chromium.png ${PN}.png
-	make_desktop_entry chromium-bin "Chromium (bin)" ${PN} "Network;WebBrowser"
+	make_desktop_entry chromium-bin "Chromium (bin)" ${PN} "Network;WebBrowser" "StartupWMClass=Chrome"
 	sed -e "/^Exec/s/$/ %U/" -i "${D}"/usr/share/applications/*.desktop \
 		|| die "desktop file sed failed"
 }
