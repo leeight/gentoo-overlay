@@ -9,7 +9,7 @@ inherit x-modular flag-o-matic
 DESCRIPTION="X.Org Xft library"
 
 KEYWORDS="~alpha ~amd64 ~arm ~hppa ~ia64 ~mips ~ppc ~ppc64 ~s390 ~sh ~sparc ~x86 ~x86-fbsd ~x86-freebsd ~x86-interix ~amd64-linux ~x86-linux ~ppc-macos ~x86-macos ~sparc-solaris ~sparc64-solaris ~x64-solaris ~x86-solaris ~x86-winnt"
-IUSE="+cleartype ubuntu"
+IUSE="cleartype ubuntu"
 
 RDEPEND="x11-libs/libXrender
 	x11-libs/libX11
