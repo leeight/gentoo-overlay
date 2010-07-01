@@ -40,7 +40,7 @@ DEPEND="${RDEPEND}
 	dev-util/pkgconfig"
 
 src_compile() {
-	./autogen.sh --prefix=/usr
+	./autogen.sh --prefix=/usr --enable-debug=yes
 	econf || die "econf failed"
 	emake || die "emake failed"
 }

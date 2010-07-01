@@ -3,107 +3,117 @@
 # $Header: $
 
 EAPI="2"
-
-NEED_PYTHON="2.5"
-#EGIT_OFFLINE="yes_do_it"
-#EGIT_PATCHES="ibus-daemon-not-ibus.diff"
+PYTHON_DEPEND="python? 2:2.5"
+inherit eutils gnome2-utils multilib python git
 EGIT_REPO_URI="git://github.com/phuang/${PN}.git"
-inherit autotools multilib git python
 
 DESCRIPTION="Intelligent Input Bus for Linux / Unix OS"
-HOMEPAGE="http://ibus.googlecode.com"
+HOMEPAGE="http://code.google.com/p/ibus/"
 SRC_URI=""
 
 LICENSE="LGPL-2.1"
 SLOT="0"
 KEYWORDS="~amd64 ~x86"
-IUSE="nls qt4 doc test"
+IUSE="doc +gconf gtk nls +python vala X"
 FEATURES="nostrip"
 
-COMMOM_DEPEND=">=dev-libs/glib-2.18
-	dev-libs/dbus-glib
-	sys-apps/dbus
-	>=gnome-base/gconf-2.12
+RDEPEND=">=dev-libs/glib-2.18
 	x11-libs/gtk+:2
-	x11-libs/libX11
-	sys-libs/glibc
-	qt4? (
-		x11-libs/qt-core
-		x11-libs/qt-dbus
-	)"
-DEPEND="${COMMOM_DEPEND}
-	dev-util/cvs
-	dev-util/pkgconfig
-	>=sys-devel/gettext-0.16.1
-	>=dev-util/gtk-doc-1.9"
-RDEPEND="${COMMOM_DEPEND}
+	gconf? ( >=gnome-base/gconf-2.12 )
+	>=gnome-base/librsvg-2
+	sys-apps/dbus
 	app-text/iso-codes
-	dev-python/pyxdg
-	gnome-base/librsvg
-	>=dev-python/pygtk-2.12.1
-	>=dev-python/dbus-python-0.83.0
-	x11-misc/notification-daemon"
+	python? (
+		dev-python/notify-python
+		>=dev-python/dbus-python-0.83
+	)
+	nls? ( virtual/libintl )
+	vala? ( dev-lang/vala )
+	X? ( x11-libs/libX11 )"
+#	x11-libs/gtk+:3
+DEPEND="${RDEPEND}
+	>=dev-lang/perl-5.8.1
+	dev-perl/XML-Parser
+	dev-util/pkgconfig
+	doc? ( >=dev-util/gtk-doc-1.9 )
+	nls? ( >=sys-devel/gettext-0.16.1 )"
+RDEPEND="${RDEPEND}
+	python? (
+		dev-python/pygtk
+		dev-python/pyxdg
+	)"
+
+update_gtk_immodules() {
+	if [ -x /usr/bin/gtk-query-immodules-2.0 ] ; then
+		GTK2_CONFDIR="/etc/gtk-2.0"
+		# An arch specific config directory is used on multilib systems
+		has_multilib_profile && GTK2_CONFDIR="${GTK2_CONFDIR}/${CHOST}"
+		mkdir -p "${ROOT}${GTK2_CONFDIR}"
+		gtk-query-immodules-2.0 > "${ROOT}${GTK2_CONFDIR}/gtk.immodules"
+	fi
+}
 
 pkg_setup() {
-	# An arch specific config directory is used on multilib systems
-	has_multilib_profile && GTK2_CONFDIR="/etc/gtk-2.0/${CHOST}"
-	GTK2_CONFDIR=${GTK2_CONFDIR:=/etc/gtk-2.0/}
+	python_set_active_version 2
 }
 
 src_prepare() {
-	# sed -i -e '/^enable_qt4=no$/d' configure.ac || die
-	# sed -i -e "/TEMPLATE/ i\QMAKE_STRIP = true" client/qt4/${PN}.pro || die
-
-	# autopoint || die "autopoint failed"
-	# intltoolize --copy --force || die "intltoolize failed"
-	# gtkdocize --copy || die "gtkdocize failed"
-	
-
-	# disable pyc compiling
-	# mv py-compile py-compile.orig
-	# ln -s $(type -P true) py-compile
-	cp -r /home/leeight/files/ibus/* "${S}"
-	# cd "${S}"
-	# ./autogen.sh
-	# eautoconf
+	./autogen.sh --prefix=/usr || die
+	mv py-compile py-compile.orig || die
+	ln -s "$(type -P true)" py-compile || die
+	echo "ibus/_config.py" >> po/POTFILES.skip || die
+	sed -i -e "s/python/python2/" setup/ibus-setup.in ui/gtk/ibus-ui-gtk.in || die
 }
 
 src_configure() {
-	econf $(use_enable nls) \
-		$(use_enable qt4 qt4-immodule) \
+	econf \
 		$(use_enable doc gtk-doc) \
-		--disable-iso-codes-check \
-		--disable-dbus-python-check
+		$(use_enable gconf) \
+		$(use_enable gtk gtk2) \
+		$(use_enable nls) \
+		$(use_enable python) \
+		$(use_enable vala) \
+		$(use_enable X xim) || die
+		#$(use_enable gtk gtk3) \
 }
 
 src_install() {
-	emake install DESTDIR="${D}" || die "Install failed"
-	dodoc AUTHORS ChangeLog NEWS README
+	emake DESTDIR="${D}" install || die
 
-	rmdir "${D}"/usr/share/ibus/engine
+	# bug 289547
+	keepdir /usr/share/ibus/{engine,icons} || die
+
+	dodoc AUTHORS ChangeLog NEWS README || die
 }
 
 pkg_postinst() {
-	ewarn "This package is very experimental, please report your bugs to"
-	ewarn "http://ibus.googlecode.com/issues/list"
-	echo
-	elog "User documentation: http://code.google.com/p/ibus/wiki/ReadMe"
-	echo
-	if ! use qt4; then
-		ewarn "Missing qt4 use flag, ibus will not work with qt4 applications."
-		ebeep 5
-	fi
 
-	[ -x /usr/bin/gtk-query-immodules-2.0 ] && gtk-query-immodules-2.0 > \
-		"${ROOT}/${GTK2_CONFDIR}/gtk.immodules"
+	elog "To use ibus, you should:"
+	elog "1. Get input engines from sunrise overlay."
+	elog "   Run \"emerge -s ibus-\" in your favorite terminal"
+	elog "   for a list of packages we already have."
+	elog
+	elog "2. Setup ibus:"
+	elog
+	elog "   $ ibus-setup"
+	elog
+	elog "3. Set the following in your user startup scripts"
+	elog "   such as .xinitrc, .xsession or .xprofile:"
+	elog
+	elog "   export XMODIFIERS=\"@im=ibus\""
+	elog "   export GTK_IM_MODULE=\"ibus\""
+	elog "   export QT_IM_MODULE=\"xim\""
+	elog "   ibus-daemon -d -x"
 
-	# http://www.gentoo.org/proj/en/Python/developersguide.xml
-	python_mod_optimize "$(python_get_sitedir)"/${PN} /usr/share/${PN}
+	update_gtk_immodules
+
+	use python && python_mod_optimize /usr/share/${PN}
+	gnome2_icon_cache_update
 }
 
 pkg_postrm() {
-	[ -x /usr/bin/gtk-query-immodules-2.0 ] && gtk-query-immodules-2.0 > \
-		"${ROOT}/${GTK2_CONFDIR}/gtk.immodules"
+	update_gtk_immodules
 
-	python_mod_cleanup "$(python_get_sitedir)"/${PN} /usr/share/${PN}
+	use python && python_mod_cleanup /usr/share/${PN}
+	gnome2_icon_cache_update
 }
