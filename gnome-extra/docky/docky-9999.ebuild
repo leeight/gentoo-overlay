@@ -41,7 +41,7 @@ DEPEND="${RDEPEND}
 
 src_compile() {
 	./autogen.sh --prefix=/usr --enable-debug=yes
-	econf || die "econf failed"
+	# econf || die "econf failed"
 	emake || die "emake failed"
 }
 

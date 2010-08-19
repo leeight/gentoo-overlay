@@ -1,0 +1,121 @@
+diff -Nur webkit-1.3.2.orig//WebCore/css/makeprop.pl webkit-1.3.2/WebCore/css/makeprop.pl
+--- webkit-1.3.2.orig//WebCore/css/makeprop.pl	2010-06-29 09:16:11.000000000 +0800
++++ webkit-1.3.2/WebCore/css/makeprop.pl	2010-07-02 13:35:33.000000000 +0800
+@@ -105,7 +105,7 @@
+ 
+ close HEADER;
+ 
+-system("gperf --key-positions=\"*\" -D -n -s 2 CSSPropertyNames.gperf > CSSPropertyNames.cpp") == 0 || die "calling gperf failed: $?";
++system("gperf --disable-inline --key-positions=\"*\" -D -n -s 2 CSSPropertyNames.gperf > CSSPropertyNames.cpp") == 0 || die "calling gperf failed: $?";
+ 
+ open C, ">>CSSPropertyNames.cpp" || die "Could not open CSSPropertyNames.cpp for writing";
+ print C "static const char * const propertyNameStrings[$num] = {\n";
+diff -Nur webkit-1.3.2.orig//WebCore/css/makevalues.pl webkit-1.3.2/WebCore/css/makevalues.pl
+--- webkit-1.3.2.orig//WebCore/css/makevalues.pl	2010-06-29 09:16:11.000000000 +0800
++++ webkit-1.3.2/WebCore/css/makevalues.pl	2010-07-02 13:36:02.000000000 +0800
+@@ -96,7 +96,7 @@
+ EOF
+ close HEADER;
+ 
+-system("gperf --key-positions=\"*\" -D -n -s 2 CSSValueKeywords.gperf > CSSValueKeywords.cpp") == 0 || die "calling gperf failed: $?";
++system("gperf --disable-inline --key-positions=\"*\" -D -n -s 2 CSSValueKeywords.gperf > CSSValueKeywords.cpp") == 0 || die "calling gperf failed: $?";
+ 
+ open C, ">>CSSValueKeywords.cpp" || die "Could not open CSSValueKeywords.cpp for writing";
+ print C  "static const char * const valueList[] = {\n";
+diff -Nur webkit-1.3.2.orig//WebCore/html/HTMLEntityParser.cpp webkit-1.3.2/WebCore/html/HTMLEntityParser.cpp
+--- webkit-1.3.2.orig//WebCore/html/HTMLEntityParser.cpp	2010-06-29 09:16:11.000000000 +0800
++++ webkit-1.3.2/WebCore/html/HTMLEntityParser.cpp	2010-07-02 15:38:51.000000000 +0800
+@@ -31,17 +31,17 @@
+ #include <wtf/Vector.h>
+ 
+ // Use __GNUC__ instead of PLATFORM(GCC) to stay consistent with the gperf generated c file
+-#ifdef __GNUC__
++// #ifdef __GNUC__
+ // The main parser includes this too so we are getting two copies of the data. However, this way the code gets inlined.
+-#include "HTMLEntityNames.cpp"
+-#else
++// #include "HTMLEntityNames.cpp"
++// #else
+ // Not inlined for non-GCC compilers
+ struct Entity {
+     const char* name;
+     int code;
+ };
+ const struct Entity* findEntity(register const char* str, register unsigned int len);
+-#endif
++// #endif
+ 
+ using namespace WTF;
+ 
+diff -Nur webkit-1.3.2.orig//WebCore/html/LegacyHTMLDocumentParser.cpp webkit-1.3.2/WebCore/html/LegacyHTMLDocumentParser.cpp
+--- webkit-1.3.2.orig//WebCore/html/LegacyHTMLDocumentParser.cpp	2010-06-29 09:18:17.000000000 +0800
++++ webkit-1.3.2/WebCore/html/LegacyHTMLDocumentParser.cpp	2010-07-02 15:32:46.000000000 +0800
+@@ -54,7 +54,12 @@
+ #include <wtf/ASCIICType.h>
+ #include <wtf/CurrentTime.h>
+ 
+-#include "HTMLEntityNames.cpp"
++// #include "HTMLEntityNames.cpp"
++struct Entity {
++    const char* name;
++    int code;
++};
++const struct Entity* findEntity(register const char* str, register unsigned int len);
+ 
+ #define PRELOAD_SCANNER_ENABLED 1
+ 
+diff -Nur webkit-1.3.2.orig//WebCore/html/LegacyPreloadScanner.cpp webkit-1.3.2/WebCore/html/LegacyPreloadScanner.cpp
+--- webkit-1.3.2.orig//WebCore/html/LegacyPreloadScanner.cpp	2010-06-29 09:16:11.000000000 +0800
++++ webkit-1.3.2/WebCore/html/LegacyPreloadScanner.cpp	2010-07-02 13:38:03.000000000 +0800
+@@ -45,17 +45,17 @@
+ #include <wtf/unicode/Unicode.h>
+ 
+ // Use __GNUC__ instead of PLATFORM(GCC) to stay consistent with the gperf generated c file
+-#ifdef __GNUC__
++// #ifdef __GNUC__
+ // The main tokenizer includes this too so we are getting two copies of the data. However, this way the code gets inlined.
+-#include "HTMLEntityNames.cpp"
+-#else
++// #include "HTMLEntityNames.cpp"
++// #else
+ // Not inlined for non-GCC compilers
+ struct Entity {
+     const char* name;
+     int code;
+ };
+ const struct Entity* findEntity(register const char* str, register unsigned int len);
+-#endif
++// #endif
+ 
+ #define PRELOAD_DEBUG 0
+ 
+diff -Nur webkit-1.3.2.orig//WebCore/make-hash-tools.pl webkit-1.3.2/WebCore/make-hash-tools.pl
+--- webkit-1.3.2.orig//WebCore/make-hash-tools.pl	2010-06-29 09:16:11.000000000 +0800
++++ webkit-1.3.2/WebCore/make-hash-tools.pl	2010-07-02 13:36:26.000000000 +0800
+@@ -35,7 +35,7 @@
+     my $htmlEntityNamesGperf       = $ARGV[0];
+     shift;
+ 
+-    system("gperf --key-positions=\"*\" -D -s 2 $htmlEntityNamesGperf > $htmlEntityNamesGenerated") == 0 || die "calling gperf failed: $?";
++    system("gperf --disable-inline --key-positions=\"*\" -D -s 2 $htmlEntityNamesGperf > $htmlEntityNamesGenerated") == 0 || die "calling gperf failed: $?";
+ 
+ } # case "HTMLEntityNames"
+ 
+@@ -45,7 +45,7 @@
+     my $docTypeStringsGperf        = $ARGV[0];
+     shift;
+ 
+-    system("gperf --key-positions=\"*\" -s 2 $docTypeStringsGperf > $docTypeStringsGenerated") == 0 || die "calling gperf failed: $?";
++    system("gperf --disable-inline --key-positions=\"*\" -s 2 $docTypeStringsGperf > $docTypeStringsGenerated") == 0 || die "calling gperf failed: $?";
+ 
+ } # case "DocTypeStrings"
+ 
+@@ -55,7 +55,7 @@
+     my $colorDataGperf       = $ARGV[0];
+     shift;
+ 
+-    system("gperf --key-positions=\"*\" -D -s 2 $colorDataGperf > $colorDataGenerated") == 0 || die "calling gperf failed: $?";
++    system("gperf --disable-inline --key-positions=\"*\" -D -s 2 $colorDataGperf > $colorDataGenerated") == 0 || die "calling gperf failed: $?";
+ 
+ } # case "ColorData"
+ 

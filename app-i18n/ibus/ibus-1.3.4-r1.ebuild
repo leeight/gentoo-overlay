@@ -1,36 +1,32 @@
-# Copyright 1999-2009 Gentoo Foundation
+# Copyright 1999-2010 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
-# $Header: $
+# $Header: /var/cvsroot/gentoo-x86/app-i18n/ibus/ibus-1.3.4.ebuild,v 1.1 2010/05/29 08:06:21 matsuu Exp $
 
 EAPI="2"
 PYTHON_DEPEND="python? 2:2.5"
-inherit eutils gnome2-utils multilib python git
-EGIT_REPO_URI="git://github.com/phuang/${PN}.git"
+inherit eutils gnome2-utils multilib python
 
 DESCRIPTION="Intelligent Input Bus for Linux / Unix OS"
 HOMEPAGE="http://code.google.com/p/ibus/"
-SRC_URI=""
+SRC_URI="http://ibus.googlecode.com/files/${P}.tar.gz"
 
 LICENSE="LGPL-2.1"
 SLOT="0"
 KEYWORDS="~amd64 ~x86"
-IUSE="doc +gconf gtk nls +python vala X"
-FEATURES="nostrip"
+IUSE="doc +gconf nls +python"
 
 RDEPEND=">=dev-libs/glib-2.18
-	x11-libs/gtk+:2
+	>=x11-libs/gtk+-2
 	gconf? ( >=gnome-base/gconf-2.12 )
 	>=gnome-base/librsvg-2
 	sys-apps/dbus
 	app-text/iso-codes
+	x11-libs/libX11
 	python? (
 		dev-python/notify-python
 		>=dev-python/dbus-python-0.83
 	)
-	nls? ( virtual/libintl )
-	vala? ( dev-lang/vala )
-	X? ( x11-libs/libX11 )"
-#	x11-libs/gtk+:3
+	nls? ( virtual/libintl )"
 DEPEND="${RDEPEND}
 	>=dev-lang/perl-5.8.1
 	dev-perl/XML-Parser
@@ -42,6 +38,8 @@ RDEPEND="${RDEPEND}
 		dev-python/pygtk
 		dev-python/pyxdg
 	)"
+
+RESTRICT="test"
 
 update_gtk_immodules() {
 	if [ -x /usr/bin/gtk-query-immodules-2.0 ] ; then
@@ -58,7 +56,6 @@ pkg_setup() {
 }
 
 src_prepare() {
-	./autogen.sh --prefix=/usr || die
 	mv py-compile py-compile.orig || die
 	ln -s "$(type -P true)" py-compile || die
 	echo "ibus/_config.py" >> po/POTFILES.skip || die
@@ -70,12 +67,8 @@ src_configure() {
 		--disable-key-snooper \
 		$(use_enable doc gtk-doc) \
 		$(use_enable gconf) \
-		$(use_enable gtk gtk2) \
 		$(use_enable nls) \
-		$(use_enable python) \
-		$(use_enable vala) \
-		$(use_enable X xim) || die
-		#$(use_enable gtk gtk3) \
+		$(use_enable python) || die
 }
 
 src_install() {
