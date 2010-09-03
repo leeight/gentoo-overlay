@@ -1,0 +1,3986 @@
+--- freetype-2.3.11.orig/debian/README.Debian
++++ freetype-2.3.11/debian/README.Debian
+@@ -0,0 +1,35 @@
++FreeType 2 for Debian
++---------------------
++
++Hurray!  FreeType 2 is finally here!  :-)  The "6" in the package name
++"libfreetype6" is the major soname of FreeType 2's libfreetype.
++
++According to the FreeType 2 FAQ,
++
++    The FreeType 2 API is a lot simpler than the one in 1.x while being
++    much more powerful. We thus encourage you to adapt your source code
++    to it as this should not involve much work.
++
++So please try your best to help migrate your software to FreeType 2.
++
++FreeType 2.x can co-exist peacefully with FreeType 1.x with no namespace
++conflicts.  However, the source package names must be distinguished in
++Debian.  So, to truly conform with the library naming convention outlined
++in the Debian Policy, I've decided the following names for the FreeType
++packages in Debian 3.0:
++
++  FreeType 2.x:
++      Source package: freetype_2.x.x.orig.tar.gz     (current version)
++     library package: libfreetype6_2.x.x-x      (libfreetype, soname 6)
++       devel package: libfreetype6-dev_2.x.x-x  (libfreetype, soname 6)
++
++  FreeType 1.x:
++      Source package: freetype1_1.x.orig.tar.gz        (for FreeType 1)
++     library package: libttf2_1.x-?                  (libttf, soname 2)
++       devel package: libttf-dev_1.x-?               (libttf, soname 2)
++
++Simple, non?
++
++Enjoy!  :-)
++
++ -- Anthony Fok <foka@debian.org>, Mon, 23 Apr 2001 23:07:16 -0600
+--- freetype-2.3.11.orig/debian/rules
++++ freetype-2.3.11/debian/rules
+@@ -0,0 +1,261 @@
++#!/usr/bin/make -f
++#
++# This is free software; see the GNU General Public Licence
++# version 2 or later for copying conditions.  There is NO warranty.
++
++SHELL = /bin/bash
++
++# FreeType sets its -Wall in XX_CFLAGS 
++CFLAGS = -g -Werror
++
++ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
++	CFLAGS += -O0
++else
++	CFLAGS += -O2 -fno-strict-aliasing
++endif
++
++# Set the host and build architectures for use with cross-building, etc.
++DEB_HOST_GNU_TYPE	:= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
++DEB_BUILD_GNU_TYPE	:= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
++
++export DEB_HOST_GNU_TYPE
++export DEB_BUILD_GNU_TYPE
++
++conf_args = --prefix=/usr
++
++ifeq ($(DEB_BUILD_GNU_TYPE), $(DEB_HOST_GNU_TYPE))
++  conf_args += --build $(DEB_BUILD_GNU_TYPE)
++else
++  conf_args += --build $(DEB_BUILD_GNU_TYPE) --host $(DEB_HOST_GNU_TYPE)
++endif
++
++# Uncomment this to turn on verbose mode.
++#export DH_VERBOSE=1
++
++# This has to be exported to make some magic below work.
++export DH_OPTIONS
++
++# always abort if there are any problems with the symbols file
++DPKG_GENSYMBOLS_CHECK_LEVEL = 4
++export DPKG_GENSYMBOLS_CHECK_LEVEL
++
++VERSION = $(shell dpkg-parsechangelog | sed -n -e's/^Version: //p')
++ver := $(shell dpkg-parsechangelog | sed -n -e's/^Version: \(.*\)-[^-]\+/\1/p')
++
++freetype_ver := $(ver)
++ftdocs_ver   := $(ver)
++ft2demos_ver := $(ver)
++dependency = $(libpkg) (>= 2.3.11)
++
++freetype_u := freetype-$(freetype_ver)
++ftdocs_u   := freetype-doc-$(ftdocs_ver)
++ftdocs_d   := $(freetype_u)
++ft2demos_u := ft2demos-$(ft2demos_ver)
++
++libpkg := libfreetype6
++devpkg := $(libpkg)-dev
++docpkg := $(libpkg)-doc
++demospkg := freetype2-demos
++udebpkg := libfreetype6-udeb
++docdir := usr/share/doc
++freetype_config_man := $(CURDIR)/debian/freetype-config.man
++freetype_config_sgml := $(CURDIR)/debian/freetype-config.man.sgml
++
++# These files are general documentation and should go into the lib package.
++libdoc = FTL.TXT CHANGES PATENTS TODO
++
++unpack: unpack-stamp
++unpack-stamp:
++	# Unpack upstream tarballs
++	@for i in $(freetype_u) $(ftdocs_u) $(ft2demos_u); do \
++	    if [ -f $$i.tar.bz2 ]; then \
++		echo "Unpacking $$i.tar.bz2 ..."; \
++		tar -x --bzip2 -f $$i.tar.bz2; \
++	    elif [ -f $$i.tar.gz ]; then \
++		echo "Unpacking $$i.tar.gz ..."; \
++		tar -x --gzip -f $$i.tar.gz; \
++	    else \
++		echo "Error!  $$i.tar.{bz2,gz} not found!"; \
++		exit 1; \
++	    fi \
++	done
++	touch unpack-stamp
++
++patch: unpack patch-stamp
++patch-stamp:
++	cd $(freetype_u) \
++	    && QUILT_PATCHES=../debian/patches-freetype quilt push -a
++	cd $(ft2demos_u) \
++	    && QUILT_PATCHES=../debian/patches-ft2demos quilt push -a
++	touch patch-stamp
++
++build: unpack patch build-stamp
++build-stamp:
++	dh_testdir
++	cd $(freetype_u) && ./configure $(conf_args) CFLAGS="$(CFLAGS)"
++	$(MAKE) -C $(freetype_u)
++
++	$(MAKE) -C $(ft2demos_u) TOP_DIR=../$(freetype_u) \
++		OBJ_DIR=../$(freetype_u)/objs
++
++
++	docbook-to-man $(freetype_config_sgml) > $(freetype_config_man)
++
++	touch build-stamp
++
++clean:
++	dh_testdir
++	dh_testroot
++	rm -f build-stamp unpack-stamp patch-stamp
++	rm -f $(freetype_config_man)
++	rm -rf $(freetype_u) $(ft2demos_u)
++	dh_clean
++
++install: DH_OPTIONS=
++install: build
++	dh_testdir
++	dh_testroot
++	dh_clean -k
++	dh_installdirs
++
++	$(MAKE) -C $(freetype_u) DESTDIR=$(CURDIR)/debian/tmp install
++
++	dh_movefiles
++	@if [ "`find debian/tmp ! -type d`" ]; then \
++	    echo "Error!  Not all files are moved out of debian/tmp!"; \
++	    echo "Please fix your debian/*.files."; \
++	    exit 1; \
++	fi
++
++	dh_installdirs -p$(demospkg) /usr/bin
++	$(freetype_u)/builds/unix/libtool --mode=install \
++	    cp -av `find $(ft2demos_u)/bin -type f -perm -u=x -maxdepth 1` \
++		$(CURDIR)/debian/$(demospkg)/usr/bin/
++
++	cp -a $(freetype_u)/objs/.libs/*so.* $(CURDIR)/debian/$(udebpkg)/usr/lib
++
++# Build architecture-independent files here.
++# Pass -i to all debhelper commands in this target to reduce clutter.
++binary-indep: DH_OPTIONS=-i
++binary-indep:
++# We have nothing to do by default.
++
++# Build architecture-dependent files here.
++# Pass -a to all debhelper commands in this target to reduce clutter.
++binary-arch: DH_OPTIONS=-a
++binary-arch: build $(libpkg) $(devpkg) $(demospkg) $(udebpkg)
++
++$(libpkg): DH_OPTIONS=-p$(libpkg)
++$(libpkg): build install
++	dh_testdir
++	dh_testroot
++	dh_installdirs
++	dh_installdocs $(addprefix $(freetype_u)/docs/,$(libdoc)) \
++		$(ftdocs_d)/docs/ft2faq.html 
++	mkdir debian/$(libpkg)/$(docdir)/$(libpkg)/pcf
++	cp -a $(freetype_u)/src/pcf/README debian/$(libpkg)/$(docdir)/$(libpkg)/pcf/
++	dh_installexamples
++#	dh_installmenu
++#	dh_undocumented
++	dh_installchangelogs -k $(freetype_u)/ChangeLog
++	dh_strip
++	dh_link
++	dh_compress
++	dh_fixperms
++	dh_makeshlibs -V '$(dependency)' --add-udeb '$(udebpkg)'
++	dh_installdeb
++	dh_shlibdeps
++	dh_gencontrol
++	dh_md5sums
++	dh_builddeb
++
++$(devpkg): DH_OPTIONS=-p$(devpkg)
++$(devpkg): build install
++	dh_testdir
++	dh_testroot
++	dh_installdirs $(docdir)/$(libpkg)
++	ln -s $(libpkg) debian/$(devpkg)/$(docdir)/$(devpkg)
++	dh_installdocs -Xreference/README -Xreference/.cvsignore -Xcopyright \
++		-XLICENSE.TXT -XGPL.TXT \
++		$(ftdocs_d)/docs/* $(freetype_u)/docs/*
++	cd debian/$(devpkg)/usr/share/doc/$(devpkg)/ \
++		&& rm -f $(libdoc) BUILD ft2faq.html
++	dh_installman $(freetype_config_man)
++#	dh_installexamples
++#	dh_installchangelogs
++	dh_strip
++	dh_link
++	dh_compress
++	dh_fixperms
++	dh_installdeb
++	dh_shlibdeps
++	dh_gencontrol
++	dh_md5sums
++	dh_builddeb
++
++$(demospkg): DH_OPTIONS=-p$(demospkg)
++$(demospkg): build install
++	dh_testdir
++	dh_testroot
++	dh_installdirs $(docdir)
++	ln -s $(libpkg) debian/$(demospkg)/$(docdir)/$(demospkg)
++#	dh_installdocs
++#	dh_installexamples
++#	dh_installmenu
++#	dh_installmanpages
++#	dh_undocumented
++#	dh_installchangelogs
++	dh_strip
++	dh_link
++	dh_compress
++	dh_fixperms
++	dh_installdeb
++	# To be safe, make ft2demos depend on the same version of libfreetype6
++	unset DH_VERBOSE; dh_shlibdeps -l debian/$(libpkg)/usr/lib --dpkg-shlibdeps-params=-O \
++		| sed -e 's/$(dependency)/$(libpkg) (= $(VERSION))/' \
++		> debian/$(demospkg).substvars
++	dh_gencontrol
++	dh_md5sums
++	dh_builddeb
++
++$(udebpkg): DH_OPTIONS=-p$(udebpkg)
++$(udebpkg): build install
++	dh_testdir
++	dh_testroot
++	dh_installdirs
++	dh_strip
++	dh_compress
++	dh_fixperms
++	dh_installdeb
++	dh_shlibdeps
++	dh_gencontrol
++	dh_builddeb
++
++binary: binary-indep binary-arch
++
++# This variables is used only by get-orig-source, which will normally only
++# be run by maintainers.
++URL	= http://savannah.nongnu.org/download/freetype/
++
++# Download the various upstream source tarballs and pack them into a
++# single orig.tar.gz.  Assumes wget and gpg are available.
++get-orig-source:
++	@if [ ! -d "debian" ] ; then \
++	    echo 'Run this from the top directory of the Debian source' >&2; \
++	    exit 1; \
++	fi
++	mkdir freetype-$(ver)
++	set -e; \
++	cd freetype-$(ver); \
++	for i in freetype freetype-doc ft2demos; do \
++		wget $(URL)/$$i-$(ver).tar.bz2; \
++		wget $(URL)/$$i-$(ver).tar.bz2.sig; \
++		gpg --verify $$i-$(ver).tar.bz2.sig $$i-$(ver).tar.bz2 \
++		&& rm $$i-$(ver).tar.bz2.sig; \
++	done
++	tar cf freetype_$(ver).orig.tar freetype-$(ver)
++	rm -rf freetype-$(ver)
++	gzip -9 freetype_$(ver).orig.tar
++
++.PHONY: build clean binary-indep binary-arch binary unpack patch \
++	$(libpkg) $(devpkg) install get-orig-source
+--- freetype-2.3.11.orig/debian/README.source
++++ freetype-2.3.11/debian/README.source
+@@ -0,0 +1,22 @@
++Because FreeType upstream distributes the source as a set of multiple
++tarballs, the Debian package currently uses a tar-in-tar format, with
++Debian changes managed using quilt and stored in two different
++directories corresponding to the respective upstream tarballs:
++debian/patches-freetype and debian/patches-ft2demos.
++
++To unpack the patched sources, run './debian/rules patch'.
++
++For general information on how to apply patches, modify patches, or
++remove a patch, please see:
++
++    /usr/share/doc/quilt/README.source
++
++To edit patches after unpacking, cd to the subdirectory for the
++corresponding upstream tarball and use for QUILT_PATCHES either
++QUILT_PATCHES=../debian/patches-freetype or
++QUILT_PATCHES=../debian/patches-ft2demos.
++
++To upgrade to a new upstream version, run
++./debian/rules get-orig-source ver=<upstream version>, which will
++download the upstream tarballs and pack them into an .orig.tar.gz
++according to the scheme used here.
+--- freetype-2.3.11.orig/debian/libfreetype6-dev.files
++++ freetype-2.3.11/debian/libfreetype6-dev.files
+@@ -0,0 +1,7 @@
++usr/bin/freetype-config
++usr/include/
++usr/lib/*.so
++usr/lib/*.la
++usr/lib/*.a
++usr/lib/pkgconfig/
++usr/share/aclocal/
+--- freetype-2.3.11.orig/debian/libfreetype6-dev.doc-base
++++ freetype-2.3.11/debian/libfreetype6-dev.doc-base
+@@ -0,0 +1,10 @@
++Document: libfreetype6-dev
++Title: FreeType 2 Development Documentation
++Author: Various
++Abstract: Development documentatin for FreeType 2.
++Section: Programming/C
++
++Format: HTML
++Index: /usr/share/doc/libfreetype6/reference/ft2-index.html
++Files: /usr/share/doc/libfreetype6/reference/*.html
++
+--- freetype-2.3.11.orig/debian/README.quilt
++++ freetype-2.3.11/debian/README.quilt
+@@ -0,0 +1,8 @@
++To update the patches using quilt use the
++following procedure:
++
++* Unpack the tarball, for example freetype.
++* cd freetype-<version>
++* export QUILT_PATCHES=../freetype.patches
++* Do usual quilt magic.
++* quilt -p0 refresh
+--- freetype-2.3.11.orig/debian/changelog
++++ freetype-2.3.11/debian/changelog
+@@ -0,0 +1,1372 @@
++freetype (2.3.11-1ubuntu2.2) lucid-security; urgency=low
++
++  * SECURITY UPDATE: possible arbitrary code execution via buffer overflow
++    in CFF Type2 CharStrings interpreter (LP: #617019)
++    - debian/patches-freetype/CVE-2010-1797.patch: check number of operands
++      in src/cff/cffgload.c.
++    - CVE-2010-1797
++  * SECURITY UPDATE: possible arbitrary code execution via buffer overflow
++    in the ftmulti demo program (LP: #617019)
++    - debian/patches-ft2demos/CVE-2010-2541.patch: use strncat and adjust
++      sizes in src/ftmulti.c.
++    - CVE-2010-2541
++  * SECURITY UPDATE: possible arbitrary code execution via improper bounds
++    checking (LP: #617019)
++    - debian/patches-freetype/CVE-2010-2805.patch: fix calculation in
++      src/base/ftstream.c.
++    - CVE-2010-2805
++  * SECURITY UPDATE: possible arbitrary code execution via improper bounds
++    checking (LP: #617019)
++    - debian/patches-freetype/CVE-2010-2806.patch: check string sizes in
++      src/type42/t42parse.c.
++    - CVE-2010-2806
++  * SECURITY UPDATE: possible arbitrary code execution via improper type
++    comparisons (LP: #617019)
++    - debian/patches-freetype/CVE-2010-2807.patch: perform better bounds
++      checking in src/smooth/ftsmooth.c, src/truetype/ttinterp.*.
++    - CVE-2010-2807
++  * SECURITY UPDATE: possible arbitrary code execution via memory
++    corruption in Adobe Type 1 Mac Font File (LWFN) fonts (LP: #617019)
++    - debian/patches-freetype/CVE-2010-2808.patch: check rlen in
++      src/base/ftobjs.c.
++    - CVE-2010-2808
++  * SECURITY UPDATE: denial of service via bdf font (LP: #617019)
++    - debian/patches-freetype/bug30135.patch: don't modify value in static
++      string in src/bdf/bdflib.c.
++
++ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Fri, 13 Aug 2010 08:26:33 -0400
++
++freetype (2.3.11-1ubuntu2.1) lucid-security; urgency=low
++
++  * SECURITY UPDATE: denial of service and possible arbitrary code
++    execution via invalid free
++    - debian/patches/CVE-2010-2498.patch: validate number of points in
++      src/pshinter/pshalgo.c.
++    - CVE-2010-2498
++  * SECURITY UPDATE: arbitrary code execution via buffer overflow
++    - debian/patches/CVE-2010-2499.patch: check positions and return code
++      in src/base/ftobjs.c.
++    - CVE-2010-2499
++  * SECURITY UPDATE: arbitrary code execution via integer overflow
++    - debian/patches/CVE-2010-2500.patch: switch to unsigned in
++      src/smooth/ftgrays.c, check signed width and height in
++      src/smooth/ftsmooth.c.
++    - CVE-2010-2500
++  * SECURITY UPDATE: arbitrary code execution via heap buffer overflow
++    - debian/patches/CVE-2010-2519.patch: correctly calculate length in
++      src/base/ftobjs.c.
++    - CVE-2010-2519
++  * SECURITY UPDATE: arbitrary code execution via invalid realloc
++    - debian/patches/CVE-2010-2520.patch: perform bounds checking in
++      src/truetype/ttinterp.c.
++    - CVE-2010-2520
++  * SECURITY UPDATE: arbitrary code execution via buffer overflows
++    - debian/patches/CVE-2010-2527.patch: change buffer sizes in
++      src/{ftdiff,ftgrid,ftmulti,ftstring,ftview}.c.
++    - CVE-2010-2527
++
++ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Thu, 15 Jul 2010 08:46:19 -0400
++
++freetype (2.3.11-1ubuntu2) lucid; urgency=low
++
++  * Revert last change. I really did have a FTBFS that "looked" like this
++    was the cause, but it's actually something else that dropped it's
++    dependency on libfreetype6-dev.
++
++ -- Mario Limonciello <superm1@ubuntu.com>  Tue, 01 Dec 2009 02:25:21 -0600
++
++freetype (2.3.11-1ubuntu1) lucid; urgency=low
++
++  * debian/libfreetype6.files:
++    - Correct an extra period that was placed causing other packages to
++      FTBFS when linking against freetype.
++
++ -- Mario Limonciello <superm1@ubuntu.com>  Sun, 29 Nov 2009 23:30:35 -0600
++
++freetype (2.3.11-1) unstable; urgency=low
++
++  * New upstream release
++    - drop debian/patches-freetype/proper-armel-asm-declaration.patch and
++      debian/patches-freetype/CVE-2009-0946.patch, applied upstream.
++    - new symbol tt_cmap13_class_rec added to the symbols table, bump the
++      shlibs.
++
++ -- Steve Langasek <vorlon@debian.org>  Mon, 12 Oct 2009 14:14:49 -0700
++
++freetype (2.3.9-5) unstable; urgency=low
++
++  * Pass proper --host/--build args to ./configure, to support
++    cross-building.  Closes: #465292.
++  * clean up a number of unused variables in debian/rules; maybe someday
++    we'll get this package to converge on debhelper 7... :)
++  * Fix the doc-base section for libfreetype6-dev.  Closes: #315845.
++  * Remove one final reference to /usr/X11R6 in debian/rules.
++  * Drop incorrect Replaces: freetype0, freetype1
++  * Add debian/README.source, documenting the madness that is this source
++    package.
++  * Standards-Version to 3.8.0.
++  * Fix multiple integer overflows leading to arbitrary code execution
++    or DoS (CVE-2009-0946; Closes: #524925).  Thanks to Nico Golde for the
++    NMU.
++
++ -- Steve Langasek <vorlon@debian.org>  Mon, 01 Jun 2009 04:37:19 -0700
++
++freetype (2.3.9-4) unstable; urgency=low
++
++  * debian/patches-ft2demos/compiler-hardening-fixes.patch: always check the
++    return value of fread(), to appease hardened compilers such as what's
++    used in Ubuntu by default.  Set a good example, even if these demos
++    shouldn't be security-sensitive!  Also, along the way catch and fix a
++    small memory leak on error. :)
++  * debian/patches-freetype/proper-armel-asm-declaration.patch: use __asm__
++    for declaring assembly instead of asm, fixing a build failure on armel.
++
++ -- Steve Langasek <vorlon@debian.org>  Sat, 14 Mar 2009 14:35:23 -0700
++
++freetype (2.3.9-3) unstable; urgency=low
++
++  * Drop spurious Suggests: on libfreetype6-dev.  Closes: #363937.
++  * debian/patches-freetype/enable-subpixel-rendering.patch: enable subpixel
++    rendering features, used by libcairo and xft to provide LCD colour
++    filtering.  This is considered no more or less evil than the bytecode
++    interpreter which we also enable.
++  * Move debian/libfreetype6.copyright to debian/copyright, and selectively
++    install it to the single binary package in debian/rules; the same
++    copyright file is used for all the binaries anyway via symlinks, so
++    there's no reason it shouldn't ship as debian/copyright.
++    Closes: #381228.
++  * Clip redundant LICENSE.TXT and GPL.TXT files from the
++    libfreetype6-dev package.  Closes: #459802.
++
++ -- Steve Langasek <vorlon@debian.org>  Fri, 13 Mar 2009 23:09:50 -0700
++
++freetype (2.3.9-2) unstable; urgency=low
++
++  * debian/rules: bump the shlibs version, since 2.3.9 introduces a handful
++    of new symbols
++  * debian/libfreetype6.symbols: add a new symbols file, which should cause
++    most packages to have relaxed dependencies of libfreetype6 now.
++
++ -- Steve Langasek <vorlon@debian.org>  Fri, 13 Mar 2009 16:57:23 -0700
++
++freetype (2.3.9-1) unstable; urgency=low
++
++  * New upstream version; closes: #519168.
++    * fixes a SIGFPE in evince when displaying some PDFs.  Closes: #494350,
++      LP: #277294.
++    * fix a rendering issue with embedded Myriad_Pro fonts in some PDFs.
++      LP: #330438.
++    * fix a rendering issue with some glyphs not rendering in PDFs when
++      an embedded font uses CID 0.  LP: #252250.
++    * drop patches-freetype/no-segfault-on-load_mac_face, included
++      upstream.
++    * patches-ft2demos/ft2demos-2.1.7-ftbench.patch: drop unused
++      patch chunk
++  * fix up the get-orig-source target to autodetect the upstream version
++    using the changelog by default.
++
++ -- Steve Langasek <vorlon@debian.org>  Fri, 13 Mar 2009 01:07:28 -0700
++
++freetype (2.3.7-2) unstable; urgency=high
++
++  * High-urgency upload for RC bugfix.
++  * Add debian/patches-freetype/no-segfault-on-load_mac_face, patch from
++    upstream to fix a segfault due to uninitialized memory in certain
++    failures of FT_Stream_New.  Closes: #487101.
++
++ -- Steve Langasek <vorlon@debian.org>  Thu, 21 Aug 2008 12:09:17 -0700
++
++freetype (2.3.7-1) unstable; urgency=low
++
++  * New upstream release
++  * Add a new get-orig-source rule to handle downloading & packing the bits
++    for us
++  * Build-depend on x11proto-core-dev instead of the obsolete x-dev.
++  * Unset DH_VERBOSE when redirecting the output of dh_shlibdeps,
++    otherwise the substvars are kinda messed up.
++  * Fix a typo that caused debhelper log junk to be dumped into /usr.
++  * Replace ${Source-Version} with ${binary:Version} in debian/control.
++  * Don't install useless copies of /usr/share/doc/libfreetype6 in the
++    other packages, the symlink is all we need.
++
++ -- Steve Langasek <vorlon@debian.org>  Mon, 30 Jun 2008 17:57:56 -0700
++
++freetype (2.3.6-1) unstable; urgency=low
++
++  * New upstream release
++    - Fixes multiple vulnerabilities in the PFB font parser (CVE-2008-1806,
++      CVE-2008-1807, CVE-2008-1808).  Closes: #485841.
++  * Fix some very bizarre quoting of $CFLAGS in debian/rules
++
++ -- Steve Langasek <vorlon@debian.org>  Sun, 15 Jun 2008 23:52:53 -0700
++
++freetype (2.3.5-1) unstable; urgency=low
++
++  * New upstream release
++    - Drop patches 374902-composite-glyphs, CVE-2006-3467_pcf-strlen,
++      and CVE-2007-2754_ttgload, merged upstream.
++    - Bump the shlibs to 2.3.5 for new symbols.
++
++ -- Steve Langasek <vorlon@debian.org>  Sat, 07 Jul 2007 00:19:30 -0700
++
++freetype (2.2.1-6) unstable; urgency=high
++
++  * High-urgency upload for security fix.
++  * Remove spurious patch file from the package diff, sigh.
++  * Add debian/patches-freetype/CVE-2007-2754_ttgfload to address
++    CVE-2007-2754, a bug allowing execution of arbitrary code via a crafted
++    TTF image by way of an integer overflow.  Closes: #425625.
++
++ -- Steve Langasek <vorlon@debian.org>  Wed, 23 May 2007 03:26:25 -0700
++
++freetype (2.2.1-5) unstable; urgency=high
++
++  * High-urgency upload for RC bugfix.
++  * Add debian/patches-freetype/CVE-2006-3467_pcf-strlen.patch to
++    address CVE-2006-3467, a missing string length check in PCF files that
++    leads to a possibly exploitable integer overflow.  Thanks to Martin 
++    Pitt for the patch.  Closes: #379920.
++
++ -- Steve Langasek <vorlon@debian.org>  Tue, 12 Sep 2006 15:04:42 -0700
++
++freetype (2.2.1-4) unstable; urgency=low
++
++  * Drop libfreetype6.postinst code for cleaning up /usr/X11R6/lib;
++    whatever version it applied to is pre-sarge, and this code is
++    sufficiently blunt that I don't think it should be kept around.
++    Closes: #386379.
++
++ -- Steve Langasek <vorlon@debian.org>  Fri,  8 Sep 2006 13:35:30 -0700
++
++freetype (2.2.1-3) unstable; urgency=low
++
++  * Apply patch from Eugeniy Meshcheryakov <eugen@univ.kiev.ua>, applied
++    upstream, to fix bug in rendering of composite glyphs.
++    Closes: #374902.
++
++ -- Steve Langasek <vorlon@debian.org>  Sun,  3 Sep 2006 04:21:43 -0500
++
++freetype (2.2.1-2) unstable; urgency=low
++
++  * Enable full bytecode interpreter instead of just the
++    "non-patented portions".
++  * Use $(CURDIR) instead of $(PWD) to build with sudo. Closes: #367579.
++
++ -- Keith Packard <keithp@keithp.com>  Wed, 17 May 2006 00:00:35 -0500
++
++freetype (2.2.1-1) unstable; urgency=low
++
++  * New upstream release
++    - Supersedes patches freetype-2.1.10-cvsfixes.patch, 
++      freetype-2.1.10-fixaliasing.patch, freetype-2.1.10-fixautofit.patch,
++      freetype-2.1.10-fixkerning.patch, freetype-2.1.10-memleak.patch,
++      freetype-2.1.10-xorgfix.patch
++
++ -- Steve Langasek <vorlon@debian.org>  Sat, 13 May 2006 13:57:54 -0700
++
++freetype (2.2~rc4-1) unstable; urgency=low
++
++  * New upstream release
++    - this version should restore binary compatibility with version
++      2.1.7.  Closes: #314385.
++    - use the old ft2demos and freetype-docs for now; patch ft2demos
++      (temporarily only!) to still use the internal headers, which are
++      now no longer exported as part of the API
++  * Patch to handle empty short metrics, as seen in BitStream Vera.
++  * Bump shlibs to 2.2~rc4-1.  Closes: #316031.
++  * Replace debian/rules patch handling with quilt; thanks to Jurij 
++    Smakov <jurij@wooyd.org> for the patch.
++
++ -- Steve Langasek <vorlon@debian.org>  Sat,  4 Mar 2006 22:06:38 -0800
++
++freetype (2.1.10-3) unstable; urgency=low
++
++  * Removed freetype-2.1.10-fixaliasing.patch to restore proper sub-pixel
++    anti-aliased hinted rendering.  Thanks to Michael Biebl for reporting
++    the bug.  I was able to reproduce the bug setting gnome-font-properties
++    to: 96 dpi, sub-pixel anti-aliasing, full hinting, with Bitstream Vera
++    Sans Roman 11 as desktop font.  (Closes: Bug#359104)
++  * Added more fixes to debian/patches/freetype-2.1.10-cvsfixes.patch:
++     * 2006-03-27  David Turner  <david@freetype.org>
++        * src/sfnt/ttkern.c (tt_face_get_kerning): Fix a serious bug that
++          causes some programs to go into an infinite loop when dealing with
++          fonts that don't have a properly sorted kerning sub-table.
++     * 2006-03-21  Zhe Su  <james.su@gmail.com>
++        * src/base/ftoutln.c (FT_Outline_Get_Orientation): Improve algorithm.
++       This is to prevent certain emboldened and hinted glyphs from becoming
++       "weird".  See https://bugzilla.novell.com/show_bug.cgi?id=158573
++       for details.
++  * Oops, I inadvertently set the shlibs dependency to (>= 2.1.10-1)
++    in 2.1.10-2.  Reverted to (>= 2.1.5-1).
++
++ -- Anthony Fok <foka@debian.org>  Fri, 31 Mar 2006 04:11:27 +0800
++
++freetype (2.1.10-2) unstable; urgency=low
++
++  * Will Newton has agreed to let Steve Langasek adopt the package.
++    Therefore, I have taken the liberty to set the Maintainer field
++    to Steve, and to add myself as an uploader.  :-)  (See Bug#351821)
++
++  * Acknowledge NMUs by Frans Pop (shlibs for udeb, Closes: Bug#355939)
++    and by Joey Hess (xlibs-dev removal, Closes: Bug#346706).
++    Thank you all!
++
++  * Merge fixes from 2.1.10-1ubuntu1 (Many thanks!):
++     * Patches for Malone #5560.
++       [debian/patches/freetype-2.1.10-cvsfixes.patch]:
++        - various fixes (mostly embolding which caused characters to
++          slant upward, most evident for CJK users in KDE and icewm.
++          (Closes: Bug#356495, Bug#356854)
++       [debian/patches/freetype-2.1.10-xorgfix.patch]:
++        - put back internal API used by xorg-x11
++       [debian/patches/freetype-2.1.10-fixautofit.patch]:
++        - fix autofit render setup
++       [debian/patches/freetype-2.1.10-memleak.patch]:
++        - fix memleak
++       [debian/patches/freetype-2.1.10-fixkerning.patch]:
++        - fix disabled kerning
++       [debian/patches/freetype-2.1.10-fixaliasing.patch]:
++        - fix anti-aliasing rendering
++     * Changes by Jun Kobayashi <fm4j-kbys@asahi-net.or.jp>
++    -- Jonathan Riddell <jriddell@ubuntu.com>  Mon, 16 Jan 2006 17:45:50 +0900
++
++ -- Anthony Fok <foka@debian.org>  Sat, 25 Mar 2006 13:03:09 +0800
++
++freetype (2.1.10-1.2) unstable; urgency=low
++
++  * Non Maintainer Upload (closes: #355939)
++  * Add support for udeb dependency resolution in shlibs file
++  * Simplify debian/rules by making use of udeb support in debhelper
++  * Update debhelper compatibility to level 5
++
++ -- Frans Pop <fjp@debian.org>  Sat, 18 Mar 2006 17:07:46 +0100
++
++freetype (2.1.10-1.1) unstable; urgency=low
++
++  * NMU
++  * Patch from Ben Hutchings for xlibs-dev transition. Closes: #346706
++
++ -- Joey Hess <joeyh@debian.org>  Sun,  5 Mar 2006 20:31:17 -0500
++
++freetype (2.1.10-1) unstable; urgency=low
++
++  * New upstream (Closes: #298660, #245532).
++  * New maintainer, co-maintainer required!
++  * Disable CJK autohinting patch due to incompatability with this version
++    of freetype.
++  * Remove some very old unapplied patches.
++  * Add freetype-config.1 manpage.
++  * Add doc-base file for development docs. (Closes: #280827)
++  * Fix build with non-default umask. (Closes: #307464, #166511)
++  * Patch merged upstream. (Closes: #252673)
++  * Acknowledge NMUS.
++    (Closes: #221597, #225119, #226380, #249443, #251473, #302269, #259875)
++
++ -- Will Newton <will@debian.org>  Mon, 13 Jun 2005 00:44:29 +0100
++
++freetype (2.1.9-1) unstable; urgency=low
++
++   * New upstream.
++
++ -- Will Newton <will@debian.org>  Sat, 28 May 2005 14:49:00 +0100
++
++freetype (2.1.7-2.4) unstable; urgency=high
++
++  * Non-maintainer upload.
++  * freetype-2.1.7/src/bdf/bdflib.c: When a glyph has zero width or height,
++    a bitmap is not actually allocated for it, but the code used to try to
++    use it anyway. Now it no longer does that. Fix by Steve Langasek,
++    based on something I did earlier. Added
++    debian/patches/300-bdflib-zero-width-glyphs.diff. Closes: #302269
++    (Segmentation fault with certain bdf fonts).
++  * freetype-2.1.7/src/bdf/bdflib.c: BDF font files with glyphs with an
++    encoding value of at least 65536 would overflow the bitmap with 
++    65536 bits which bdflib.c uses to keep track of whether it has seen
++    an encoding already. Changed things so that encodings above the 
++    limit cause an error code to be returned instead of a segfault
++    happening. Ideally, the bitmap should be replaced with a more
++    compact representation, but that is too big a change for something
++    this small. I will, however, only lower the severity of the bug
++    (305413) to normal, instead of marking it fixed. Added
++    debian/patches/300-bdflib-large-encodings.diff.
++
++ -- Lars Wirzenius <liw@iki.fi>  Sun, 24 Apr 2005 15:42:00 +0300
++
++freetype (2.1.7-2.3) unstable; urgency=low
++
++  * NMU
++  * debian/patches/090-freetype-2.1.7-normalize-fix.diff: Patch
++    by David Mossberger.  Backport from freetype2 CVS that fixes an
++    off-by-order-of-magnitude performance issue in the normalization code.
++    (Closes: #259875)
++  
++ -- dann frazier <dannf@debian.org>  Mon, 08 Nov 2004 19:06:57 -0700
++
++freetype (2.1.7-2.2) unstable; urgency=low
++
++  * NMU
++  * debian/patches/080-freetype-2.1.7-backwards-compat.diff: Patch
++    by Shaun Jackman, integration by Thom May. Fixes backwards
++    compatibility (Closes: #251473)
++  
++ -- Frank Lichtenheld <djpig@debian.org>  Fri,  6 Aug 2004 01:03:36 +0200
++
++freetype (2.1.7-2.1) unstable; urgency=medium
++
++  * NMU
++  * [debian/patches/patches/t1load-eexec.diff, debian/rules] Patch from
++    upstream CVS
++    (http://cvs.freetype.org/cgi-bin/viewcvs.cgi/freetype2/src/type1/t1load.c.diff?r1=text&tr2=1.89&tr1=1.88&r2=text&diff_format=u)
++    to fix hanging gpdf processes. (Closes: #249443, #233255)
++
++ -- J.H.M. Dassen (Ray) <jdassen@debian.org>  Fri,  4 Jun 2004 18:56:41 +0200
++
++freetype (2.1.7-2) unstable; urgency=low
++
++  * Acknowledging 2.1.7-1.1.  Many thanks to David Mosberger-Tang and
++    fellow Debian developer J.H.M. Dassen (Ray) for fixing the
++    gnumeric and abiword crashing problem on powerpc and ia64
++    by compiling with -fno-strict-aliasing.  Will report upstream.
++  * Applied Akito Hirai's freetype-2.1.7-autohint-cjkfonts-20031130.patch.
++    Thanks to Firefly's detailed testing and development, and to Shuke
++    (Fan Xiaoju) and Tetralet for building unofficial debs.  :-)
++     - http://firefly.idv.tw/test/Forum.php?Board=1&Article=72498077a4859413781ed6885760caa7&Func=view&History=0
++     - http://www.linuxfans.org/nuke/modules.php?name=Forums&file=viewtopic&t=51830
++  * Converted changelog.Debian.gz to UTF-8.
++  * Removed /usr/share/doc/libfreetype6/reference/.cvsignore.
++
++ -- Anthony Fok <foka@debian.org>  Sat, 24 Jan 2004 08:00:31 +0800
++
++freetype (2.1.7-1.1) unstable; urgency=high
++
++  * NMU
++  * [debian/control] Applied patch by David Mosberger-Tang
++    <David.Mosberger@acm.org> to compile -fno-strict-aliasing. Freetype
++    is apparently known to be unsafe for strict-aliasing rules defined
++    by ANSI (and the compiler configuration files in the upstream
++    source package itself reflect that), which caused crashes on ia64
++    and powerpc. This patch has been confirmed to fix the gnumeric and
++    abiword crashes on powerpc. (Closes: #221597, #225119, #226380).
++
++ -- J.H.M. Dassen (Ray) <jdassen@debian.org>  Tue,  6 Jan 2004 11:35:55 +0100
++
++freetype (2.1.7-1) unstable; urgency=low
++
++  * New upstream version.
++
++ -- Anthony Fok <foka@debian.org>  Sat, 15 Nov 2003 00:49:55 +0800
++
++freetype (2.1.5-3) unstable; urgency=high
++
++  * debian/patches/freetype-2.1.5-type1-crash.diff: prevents
++    crashes when opening Type1 fonts with PaintType != 0 or
++    StrokeWidth != 0, exhibited with e.g. Hershey fonts in gsfonts-other.
++    Many thanks to Josselin Mouette (Debian fontconfig maintainer) for
++    analysis and patch!  (Closes: Bug#216605, #216649, #216761)
++  * FTC_SBit_Cache_Lookup() exhibits a bug in ah_hinter_load_glyph
++    where FT_Render_Glyph may be called twice under some circumstances.
++    Many thanks to Ralf for reporting and upstream author Werner Lemberg
++    for fixing the bug.  (Closes: Bug#213232, #208943, #209715)
++  * Added Conflicts: xpdf-reader (<< 1.00-4) to avoid problems with users
++    upgrading from Debian 3.0.  Thanks to Adrian Bunk for the bug report.
++    (Partially fixes Bug#214732)
++
++ -- Anthony Fok <foka@debian.org>  Wed, 22 Oct 2003 10:58:14 +0800
++
++freetype (2.1.5-2) unstable; urgency=low
++
++  * Added patch by David Bevan ([devel] 2003-09-19) to fix read_pfb_tag()
++    so it does not fail on end-of-file indicated (0x8003).
++  * Do not install the irrelevant docs/reference/README.  (Closes: Bug#211755)
++
++ -- Anthony Fok <foka@debian.org>  Sun, 21 Sep 2003 01:35:44 +0800
++
++freetype (2.1.5-1) unstable; urgency=low
++
++  * New upstream official 2.1.5 release.  (ftdocs is still 2.1.4.)
++  * Set libfreetype6-udeb to Priority: extra to fix override disparity.
++
++ -- Anthony Fok <foka@debian.org>  Tue, 16 Sep 2003 23:43:48 +0800
++
++freetype (2.1.4-5) unstable; urgency=low
++
++  * CVS updates as of 2003-08-18.  Upstream has restored binary
++    compatibility with the FreeType 2.1.4 and previous releases.
++  * Applied patch by Mike Fabian (2003-08-27): check bdf properties
++    WEIGHT_NAME and SLANT case insensitively.  Many thanks!  :-)
++  * Reversed YAMANO-UCHI Hidetoshi's 2003-06-13 change to ft2demos
++    graph/x11/rules.mk; Debian shys away from setting rpath.
++
++ -- Anthony Fok <foka@debian.org>  Thu, 28 Aug 2003 02:10:29 +0800
++
++freetype (2.1.4-4) unstable; urgency=low
++
++  * CVS updates as of 2003-06-07 with many fixes, including:
++    - Werner Lemberg has fixed the problem FreeType 2 had with
++      HuaTian multiple-level subglyphs fonts like htst3.ttf.
++      Many thanks!  :-)
++  * TT_CONFIG_OPTION_FORCE_UNPATENTED_HINTING is left undefined for now.
++    (MS web core fonts like MonoType Arial would become distorted.)
++  * Disable Firefly's GRAYS_USE_GAMMA patch for now: I have received
++    several bug reports about "ugly fonts" or jaggies already, and I am
++    not sure whether it is due to the adjusted gamma values or
++    the new unpatented hinting in CVS.  Let's see what happens.  :-)
++    (Closes: Bug#196029, #196048, #196086)
++  * Yikes, Werner's number to pointer changes broke binary compatibility
++    with XFree86 4.3.0.  I hope the patch
++       100-freetype-2.1.4-CVS-int-fixed_p-incompatibility.diff
++    correctly reverts the problem.  My apologies to the Debian XFree86
++    for my oversight.
++  * FreeType 2.1.4 was unable to read some gzip'ed fonts Many thanks to
++    "Alexis S. L. Carvalho" <alexis@cecm.usp.br> for diagnosing and
++    correcting the problem.  (Closes: Bug#184355)
++  * Note to self: Debian's file/libmagic1 (4.02-4) misdetects
++    libfreetype.so.6.3.3 as "Linux/i386 core" file on i386 platforms.
++
++ -- Anthony Fok <foka@debian.org>  Sun,  8 Jun 2003 13:42:26 +0800
++
++freetype (2.1.4-3) unstable; urgency=low
++
++  * CVS updates as of 2003-06-01:
++    - Removed my 010-ft2demos-2.1.4-ucs4.diff and
++      Akito's 011-freetype-2.1.4-ttcmap4.diff: already applied upstream.
++  * [ftoption.h] Enabled Graham Asher's unpatented hinting:
++      #define TT_CONFIG_OPTION_BYTECODE_INTERPRETER
++      #define TT_CONFIG_OPTION_COMPILE_UNPATENTED_HINTING
++    Many thanks to Graham Asher and Artifex for their contribution!
++  * Temporary disable Akito Hirai's CJK autohinting enhancement: it
++    currently does not apply cleanly to FreeType CVS.
++  * [libfreetype6-dev.files]: Added usr/lib/pkgconfig/ for freetype2.pc.
++  * Added Firefly's patch to #define GRAYS_USE_GAMMA with finetune.
++
++ -- Anthony Fok <foka@debian.org>  Tue,  3 Jun 2003 02:54:40 +0800
++
++freetype (2.1.4-2) unstable; urgency=low
++
++  * Applied CVS fixes as of 2003-04-09.
++  * Applied freetype-2.1.3-ttcmap4.patch by Akito Hirai to handle buggy
++    Unicode CMap (cmap4) in CJK Dyna fonts.
++  * Applied Akito Hirai's autohinting enhancement for CJK fonts (2003-04-16).
++
++ -- Anthony Fok <foka@debian.org>  Mon, 21 Apr 2003 01:48:07 +0800
++
++freetype (2.1.4-1) unstable; urgency=low
++
++  * New upstream release.
++  * The Section for libfreetype6-dev has been changed from devel to libdevel.
++
++ -- Anthony Fok <foka@debian.org>  Tue,  8 Apr 2003 23:28:21 +0800
++
++freetype (2.1.3+2.1.4rc2-5) unstable; urgency=low
++
++  * FreeType 2.1.4 release candidate as of 2003-03-27.
++  * The rounding code in FT_Set_Char_Size() has been changed slightly
++    from 2.1.3+2.1.4rc2-4.  Please test to see if native TrueType hinting
++    (with bytecode interpreter) still looks good.  Thanks!
++  * Fine-tuned font->num_indices in ft2demos/src/ftcommon.i by encoding.
++
++ -- Anthony Fok <foka@debian.org>  Mon, 31 Mar 2003 03:47:29 +0800
++
++freetype (2.1.3+2.1.4rc2-4) unstable; urgency=low
++
++  * FreeType 2.1.4rc2 with CVS update as of 2003-03-20.
++  * More rounding fixes from Artur Zaprzala.
++  * Reverted FT_Set_Char_Size() to forced rounding as before.  This is
++    a temporary measure to get bytecode-interpreter hinted fonts display
++    properly.
++
++ -- Anthony Fok <foka@debian.org>  Tue, 25 Mar 2003 01:34:15 +0800
++
++freetype (2.1.3+2.1.4rc2-3) unstable; urgency=medium
++
++  * The "Welcome to the world, Lucie Turner!" release.  :-)
++  * FreeType 2.1.4rc2 with CVS update as of 2003-03-15.
++  * Upstream author David Turner has fixed src/truetype/ttdriver.c
++    (Set_Char_Sizes) rounding issues.  The fonts on the screen should
++    look good as before now.  (Closes: Bug#181938, #183794, #182674)
++
++ -- Anthony Fok <foka@debian.org>  Sun, 16 Mar 2003 00:05:22 +0800
++
++freetype (2.1.3+2.1.4rc2-2) unstable; urgency=medium
++
++  * Reversed upstream author's 2003-02-25 patch on ttdriver.c:
++     - src/truetype/ttdriver.c (Set_Char_Sizes): fixed a rounding bug when
++       computing the scale factors for a given character size in points with
++       resolution.
++
++    Not sure what how undoing this would affect autohinting, but at least
++    rendering with bytecode interpreter is back to normal.  :-)
++    (Follow-up: Bug#181938, #183794, #182674, etc.)
++
++  * Tests with David Chester's suggested patches, e.g. symmetric "m".
++
++  * Added a fix for double free in the embedded bitmap code in freetype.
++    The bug was crashing OpenOffice.org.  Thanks to Mandrake's Gwenole
++    Beauchesne for his suggested fix!  (Follow-up: Bug#183272)
++
++ -- Anthony Fok <foka@debian.org>  Thu, 13 Mar 2003 00:51:09 +0800
++
++freetype (2.1.3+2.1.4rc2-1) unstable; urgency=low
++
++  * FreeType 2.1.4rc2 with CVS update as of 2003-02-28:
++     - ft_gzip_file_done memory leak fix.  (May fix #175889, #176138)
++     - scaling round-off error fix.  May fix #182674, #181938.
++     - infinite loop fix in ftgzip.c.  (Closes: Bug#177439)
++  * libfreetype6.postinst: Remove /usr/X11R6/lib/libfreetype.so* leftover
++    by some old version of XFree86 package.
++  * Added libfreetype6-udeb for the GTK frontend of the debian-installer.
++    Many thanks to Sebastian Ley for providing the appropriate patch!
++    (Closes: Bug#182208)
++  * freetype2-demos now depends on the exact version of libfreetype6.
++    (Closes: Bug#151233)
++
++ -- Anthony Fok <foka@debian.org>  Wed,  5 Mar 2003 02:21:46 +0800
++
++freetype (2.1.3-10) unstable; urgency=low
++
++  * FreeType 2.1.4rc1 with CVS update as of 2003-02-18.  (Closes: Bug#179450)
++  * Made 008-freetype-2.1.4rc1-ftccmap-ucs4.patch:
++      ftc_cmap_family_init() now, like find_unicode_charmap() in ftobjs.c,
++      favours UCS-4 charmap if there is one.
++  * Made 009-freetype-2.1.4rc1-typo.patch:
++      Minor typographical fixes, e.g. asian -> Asian.
++  * Made 010-ft2demos-2.1.4rc1-ucs4.patch:
++      Let ft2demos handle up to U+10FFFF.
++
++ -- Anthony Fok <foka@debian.org>  Fri, 21 Feb 2003 02:59:12 +0800
++
++freetype (2.1.3-9) unstable; urgency=low
++
++  * Backed out David Turner's modified bluescale implementation (2.1.3-8)
++    and put back David Chester's original patch (2.1.3-7) until rendering
++    with bytecode interpreter turned on is improved.  (See Bug#179450)
++
++ -- Anthony Fok <foka@debian.org>  Mon,  3 Feb 2003 03:44:56 +0800
++
++freetype (2.1.3-8) unstable; urgency=low
++
++  * CVS update as of 2003-01-31.  David Chester's bluescale patch is now
++    implemented upstream.  Also, the excessive debug messages in 2.1.3-7
++    should be gone now.
++
++ -- Anthony Fok <foka@debian.org>  Sat,  1 Feb 2003 16:19:44 +0800
++
++freetype (2.1.3-7) unstable; urgency=low
++
++  * CVS update as of 2003-01-22.
++  * Added David Chester's latest bluescale2 patch.  (2003-01-23 on the
++    FreeType devel mailing list.)
++
++ -- Anthony Fok <foka@debian.org>  Sat, 25 Jan 2003 02:16:52 +0800
++
++freetype (2.1.3-6) unstable; urgency=low
++
++  * Oops, forgot to run aclocal as "aclocal -I ." to search for
++    ft-munmap.m4.  Thanks to Werner Lemberg for the note.
++
++ -- Anthony Fok <foka@debian.org>  Sat, 18 Jan 2003 22:45:19 +0800
++
++freetype (2.1.3-5) unstable; urgency=low
++
++  * CVS update as of 2003-01-17.
++  * Added a patch to relax table.Length checking because some buggy software
++    pads it to a multiple of 4 bytes.
++    (007-freetype-2.1.3-ttload-table-length.patch)
++  * Updated to latest libtool and regenerate configure so it builds properly
++    on mips/mipsel.  Thanks to Ryan Murray for reporting the issue.
++    Also forwarded upstream.  (Closes: Bug#176044)
++
++ -- Anthony Fok <foka@debian.org>  Fri, 17 Jan 2003 07:52:25 +0800
++
++freetype (2.1.3-4) unstable; urgency=high
++
++  * Oops, forgot to add the corresponding Depends: zlib1g-dev | libz-dev
++    to libfreetype6-dev.  Fixed.  Thanks to Colin Walters for the reminder!
++    (Closes: Bug#174019)
++
++ -- Anthony Fok <foka@debian.org>  Mon, 23 Dec 2002 12:51:41 +0800
++
++freetype (2.1.3-3) unstable; urgency=high
++
++  * With the previous CVS update, configure.ac was revised, but autoconf
++    was not run, leading to an unsubstituted @LIBZ@ in freetype-config.
++    My apologies for the problems it caused.  (Closes: Bug#173834)
++  * Patched configure.ac and unix-cc.in to set LDFLAGS=-lz and to ensure
++    that libfreetype.so.* is explicitly linked with zlib.
++  * Added Build-Dependency: libz-dev, autoconf.  (Note to self: remove
++    autoconf later.)
++
++ -- Anthony Fok <foka@debian.org>  Sun, 22 Dec 2002 06:03:03 +0800
++
++freetype (2.1.3-2) unstable; urgency=low
++
++  * CVS updates as of 2002-12-18.
++
++ -- Anthony Fok <foka@debian.org>  Sat, 21 Dec 2002 01:28:23 +0800
++
++freetype (2.1.3-1) unstable; urgency=low
++
++  * New upstream release.
++  * Revised my freetype-2.1.3-ttgload-monospace-halfwidth.patch to use
++    52% as the threshold.
++  * New version supports gzipped PCF fonts.  (Closes: Bug#163207)
++
++ -- Anthony Fok <foka@debian.org>  Mon,  9 Dec 2002 01:36:21 +0800
++
++freetype (2.1.2-10) unstable; urgency=low
++
++  * Turning back on the bytecode interpreter.  Too tired to care now.
++    May turn it off again when Xft2 and fontconfig are in Debian.
++  * Removed libkpathsea-dev build-dependency.  It was used for the the
++    FreeType 1 contributed tools, but those tools were not yet ported
++    to FreeType 2.  Also removed the 'debian/\' file.  Thanks to
++    P. Doblerman for the bug report.  (Closes: Bug#166064)
++
++ -- Anthony Fok <foka@debian.org>  Thu, 24 Oct 2002 10:17:18 +0800
++
++freetype (2.1.2-9) unstable; urgency=medium
++
++  * By popular demand, disabled the ft-slight patch.  Let's see what happens.
++    (Closes: Bug#164477)
++
++ -- Anthony Fok <foka@debian.org>  Thu, 17 Oct 2002 23:37:36 +0800
++
++freetype (2.1.2-8) unstable; urgency=low
++
++  * CVS updates as of 2002-10-07
++  * Applied David Chester's ft-slight patch.  Thanks to Roger So for the
++    suggestion.  (Closes: Bug#163900)
++  * Turned off the bytecode interpreter.
++
++ -- Anthony Fok <foka@debian.org>  Fri, 11 Oct 2002 02:00:18 +0800
++
++freetype (2.1.2-7) unstable; urgency=medium
++
++  * CVS updates as of 2002-09-25
++  * Revised ftbench.c to count by num_charcodes (cmap entries) instead of
++    face->num_glyphs.
++  * Oops, I forgot to uncomment dh_strip after a debug session!
++    Thanks to Daniel Burrows for catching this!  (Closes: Bug#162346)
++
++ -- Anthony Fok <foka@debian.org>  Thu, 26 Sep 2002 15:46:31 +0800
++
++freetype (2.1.2-6) unstable; urgency=medium
++
++  * CVS updates as of 2002-09-21 (after VER-2-1-3-RC2)
++  * Backported patches that I made for Thiz Linux, as listed below.
++  * Do not force horizontal.advance_Width_Max even when
++    postscript.isFixedPitch is true so that the ASCII characters in some
++    CJK fonts are displayed correctly.
++  * Revised my CMap4 patch to take care of tt_cmap4_char_index() and
++    tt_cmap4_char_next() too.  (Closes: Bug#161933)
++  * ftbench allocates face->num_glyphs, but number of codepoints read
++    from CMap4 may be more, causing it to segfault with opens___.ttf.
++    Fixed.
++
++ -- Anthony Fok <foka@debian.org>  Wed, 25 Sep 2002 09:45:14 +0800
++
++freetype (2.1.2-5) unstable; urgency=high
++
++  * CVS updates as of 2002-09-05
++  * Fixed some typos in ftimage.h introduced in VER-2-1-3-RC1,
++    e.g. s/zft_outline_reverse_fill/ft_outline_reverse_fill/
++    so that gnome-print may be built properly.  Thanks to
++    Rick Younie, Christian Marillat and Kalle Olavi Niemitalo
++    for the bug report.  (Closes: Bug#159806)
++
++ -- Anthony Fok <foka@debian.org>  Sun,  8 Sep 2002 23:18:29 +0800
++
++freetype (2.1.2-4) unstable; urgency=high
++
++  * s/FT_ENCODING_SYMBOL/FT_ENCODING_MS_SYMBOL/ (typo) in freetype.h .
++    Thanks to Branden Robinson for tracking down the error.
++    (Closes: Bug#159375)
++
++ -- Anthony Fok <foka@debian.org>  Tue,  3 Sep 2002 11:35:42 +0800
++
++freetype (2.1.2-3) unstable; urgency=low
++
++  * CVS updates as of 2002-08-29 (around VER-2-1-3-RC1)
++  * Make FreeType less strict when some slightly buggy fonts set
++    the CMap format 4 last segment idRangeOffset to 0xFFFF.
++    Thanks to Werner Lemberg and George Williams for pinpointing the bug.
++    (Fixes: Bug#150678, #155864)
++
++ -- Anthony Fok <foka@debian.org>  Mon,  2 Sep 2002 05:53:48 +0800
++
++freetype (2.1.2-2) unstable; urgency=low
++
++  * Added CVS updates as of 2002-08-06.
++  * Werner Lemberg (one of the upstream authors) has fixed TTC reading
++    problem.  Thanks to Kenshi Muto and Ishikawa Mutsumi for the report.
++    (Closes: Bug#154221)
++  * An extraneous /usr/X11R6/lib/libfreetype.so (not from this package)
++    was the culprit to some of the mysterious segmentation faults
++    that some users were experiencing.  Thanks to Akira TAGOH for tracking
++    down the problem.  (Closes: Bug#142674, #149472, #149759, #150596)
++
++ -- Anthony Fok <foka@debian.org>  Fri,  9 Aug 2002 02:22:00 +0800
++
++freetype (2.1.2-1) unstable; urgency=low
++
++  * New upstream release with CVS updates as of 2002-07-11.
++
++ -- Anthony Fok <foka@debian.org>  Mon, 15 Jul 2002 02:24:09 +0800
++
++freetype (2.1.1-3) unstable; urgency=medium
++
++  * Sync'ed with CVS as of 2002-06-16.
++  * "New version breaks Pango" was fixed by the newly recompiled
++    Pango package.  (Thanks, Akira TAGOH!  :-)  (Closes: Bug#150039)
++  * Applied patches from Detlef Würkner (003-freetype-type1-cmap.patch,
++    004-freetype-select-charmap.patch): the latter one fixes
++    the icon-text-disappears-in-Nautilus problem.  Many thanks!
++    (Closes: Bug#150084)
++  * Applied patch from Sven Neumann (005-freetype-pfr-direction.patch).
++    Many thanks!
++
++ -- Anthony Fok <foka@debian.org>  Wed, 19 Jun 2002 01:37:48 +0800
++
++freetype (2.1.1-2) unstable; urgency=low
++
++  * Up'ed versioned dependency to libfreetype6 (>= 2.1.1) because 2.1.1
++    introduced some changes that is binary incompatible (but source
++    compatible) with previous versions, and Pango needs to be recompiled.
++  * Added fixes from CVS as of 2002-06-14.
++  * TOP became TOP_DIR
++
++ -- Anthony Fok <foka@debian.org>  Sun, 16 Jun 2002 13:28:33 +0800
++
++freetype (2.1.1-1) unstable; urgency=medium
++
++  * New upstream release.
++  * Added versioned dependency to libfreetype6 (>= 2.1.0).  Thanks to
++    Akira TAGOH for the suggestion.  (Closes: Bug#140772, Bug#140821)
++
++ -- Anthony Fok <foka@debian.org>  Fri, 14 Jun 2002 00:51:01 +0800
++
++freetype (2.0.9-1) unstable; urgency=high
++
++  * New upstream release.  Among other enhancements, it contains this
++    important fix:
++
++     - Certain fonts, like "foxjump.ttf" contain broken name tables with
++       invalid entries and wild offsets.  This caused FreeType to crash when
++       trying to load them.
++
++    Kudos to upstream author David Turner for fixing the bug so quickly!
++
++    This bug causes gnome-print to crash for users with certain freeware
++    or shareware fonts, so please put in woody.  Thanks!
++    (Closes: Bug#135654, Bug#135896)
++
++ -- Anthony Fok <foka@debian.org>  Tue, 12 Mar 2002 01:43:14 +0800
++
++freetype (2.0.8-1) unstable; urgency=medium
++
++  * New upstream version.  Contains a few more important bug fixes.
++    Please put in woody.  Thanks!
++  * libfreetype6-dev now Depends on libc6-dev | libc-dev
++    (Closes: Bug#132640)
++  * Uses new configure script so that it builds on the netbsd-i386
++    Debian port too.  (Closes: Bug#132693)
++
++ -- Anthony Fok <foka@debian.org>  Wed, 13 Feb 2002 03:35:52 +0800
++
++freetype (2.0.7-1) unstable; urgency=medium
++
++  * New upstream version.  Reportedly fixes a problem that may KDE to
++    crash upon reading certain fonts.  (Yes, please put in Debian 3.0).
++  * Applied upstream fix to freetype-config.
++
++ -- Anthony Fok <foka@debian.org>  Tue,  5 Feb 2002 03:44:27 +0800
++
++freetype (2.0.6-1) unstable; urgency=low
++
++  * New upstream release with important bug fixes.
++  * Removed two Debian small patches as they have been applied upstream.
++
++ -- Anthony Fok <foka@debian.org>  Mon, 14 Jan 2002 01:25:06 +0800
++
++freetype (2.0.5-2) unstable; urgency=low
++
++  * Oops, README and .cvsignore were erroneously placed in /usr/bin in
++    freetype2-demos.  Thanks to YAMASHITA Junji for the bug report.
++    (Closes: Bug#119119)
++
++ -- Anthony Fok <foka@debian.org>  Sun, 11 Nov 2001 23:55:40 +0800
++
++freetype (2.0.5-1) unstable; urgency=low
++
++  * New upstream release.
++  * Updated libfreetype6.copyright.
++  * Applied patch to builds/unix/freetype-config.in to prevent
++    /usr/bin/freetype-config from providing gcc with -L/usr/lib.
++    Thanks to Gordon Sadler for providing the patch.  (Closes: Bug#101391)
++  * Added /usr/share/aclocal/freetype2.m4 for autoconf and friends.
++    in libfreetype6-dev.  Thanks to Marcelo E. Magallon for contributing
++    this file.  (Closes: Bug#117156)
++
++ -- Anthony Fok <foka@debian.org>  Sat, 10 Nov 2001 13:10:25 +0800
++
++freetype (2.0.2.20010514-1) unstable; urgency=low
++
++  * New upstream snapshot, post-2.0.2 freetype2-current as of 2001-05-14.
++  * Silly me!  I fixed the `missing "xlibs-dev" in Build-Depends'
++    in 2.0.2.20010422-2, but closed the wrong bug report!?
++    Thanks to Martin Schmitz for the bug report.  (Closes: Bug#95328)
++  * libtool-1.4 is not 100% compatible with the libtool-1.3.5 included
++    in the upstream source.  Also, it seems to be unnecessary to
++    Build-Depends on libtool, therefore removed.
++    Thanks to Laurent Bonnaud for the bug report.  (Closes: Bug#97552)
++  * [ftoption.h]: #define TT_CONFIG_OPTION_BYTECODE_INTERPRETER
++
++ -- Anthony Fok <foka@debian.org>  Tue, 15 May 2001 16:49:26 -0600
++
++freetype (2.0.2.20010422-2) unstable; urgency=medium
++
++  * Hehe, silly me, I forgot to add "xlibs-dev" to Build-Depends
++    when I merged in freetype2-demos.  Thanks to Martin Michlmayr
++    for the notice.  Closes: Bug#94569.
++
++ -- Anthony Fok <foka@debian.org>  Thu, 26 Apr 2001 21:20:17 -0600
++
++freetype (2.0.2.20010422-1) unstable; urgency=low
++
++  * Updated to post-2.0.2 freetype2-current as of 2001-04-22.
++  * On i386, freetype2-demos is rebuilt with xlibs_4.0.2-13 instead of the
++    pre-release xlibs_4.0.3.  My apologies.
++  * Replaced "tetex-dev" with "libkpathsea-dev" in Build-Depends.
++    Thanks to Michael Schmitz for the bug report.  Closes: Bug#91897.
++  * Updated README.Debian to reflect the FreeType 1.x package name
++    change from freetype2{,-dev} [sic] to libttf{2,-dev}.
++
++ -- Anthony Fok <foka@debian.org>  Mon, 23 Apr 2001 23:08:51 -0600
++
++freetype (2.0.2.20010412-1) unstable; urgency=low
++
++  * New upstream release, post-2.0.2 freetype2-current as of 2001-04-12.
++  * Arnd Bergmann, Tom Kacvinsky et al. pinpointed and fixed a bug
++    in FreeType-2.0.2 which caused KDE and "xterm -fa" to segfault.
++    Thanks guys!  :-)  Closes: Bug#89326.
++  * New binary package: freetype2-demos.
++  * The source package reorganized to include three upstream tarballs
++    (freetype, ftdocs, ft2demos) in one *.orig.tar.gz.
++
++ -- Anthony Fok <foka@debian.org>  Fri, 13 Apr 2001 02:02:42 -0600
++
++freetype (2.0.1.20010317-1) unstable; urgency=low
++
++  * Updated to freetype2-current as of 2001-03-17.
++  * [builds/unix/install.mk]:
++     - IMHO, the current upstream source caters too much to broken
++       compilers that the Unix build suffers somewhat.
++     - Use sed to replace all instances of
++       <freetype/{,config/,internal/}*.h>
++       with FT2_{PUBLIC,CONFIG,INTERNAL}_FILE(*.h), which currently
++       expands to <freetype2/freetype/{,config/,internal/}*.h>
++       in freetype/config/ftheader.h and freetype/internal/internal.h.
++     - This fix, without sacrificing compatibility on some brain-dead
++       compilers on other platforms, may mean that
++       "-I/usr/include/freetype2" is no longer needed on Unix/Linux/Hurd
++       platforms.
++     - But it would be very foolish to remove "-I/usr/include/freetype2".
++       Thou shalt always use $(shell freetype-config --cflags).
++     - Thanks to Gordon Sadler for the suggestion.  :-)
++       Closes: Bug#79951.
++  * [builds/unix/ft2unix.h]:
++     - Removed the FT2_{PUBLIC,CONFIG,INTERNAL}_FILE macros because
++       they are already defined in freetype/config/ftheader.h.
++     - Use FT2_ROOT instead.  Afterall, cpp on Unix is not broken.  ;-)
++     - Thanks to Takuo Kitame for reporting the conflicting #define's.
++       Closes: Bug#89363.
++  * [debian/rules]: Moved out some old cruft to rules.museum.
++
++ -- Anthony Fok <foka@debian.org>  Mon, 19 Mar 2001 03:27:14 -0700
++
++freetype (2.0.1.20010312-1) unstable; urgency=low
++
++  * Updated to freetype2-current as of 2001-03-12.
++  * [debian/control]:
++     - Build-Depends: debhelper (>= 3.0.0), ...
++     - Standards-Version: 3.5.2
++
++ -- Anthony Fok <foka@debian.org>  Fri, 16 Mar 2001 02:21:31 -0700
++
++freetype (2.0.1.20010308-1) unstable; urgency=low
++
++  * Updated to freetype2-current as of 2001-03-08.
++  * Corrected platform detection on Hurd.  Thanks to Jeff Bailey,
++    Werner and David for the fix.  Closes: Bug#87691.
++
++ -- Anthony Fok <foka@debian.org>  Fri,  9 Mar 2001 00:50:12 -0700
++
++freetype (2.0.1-1) unstable; urgency=low
++
++  * New upstream release.
++
++ -- Anthony Fok <foka@debian.org>  Fri,  1 Dec 2000 17:58:32 -0700
++
++freetype (2.0-1) unstable; urgency=low
++
++  * New upstream FreeType 2 official release.
++     - Source package: freetype
++     - Binary packages: libfreetype6 and libfreetype6-dev.
++    The source package of FreeType 1.3.1 has been renamed to freetype1.
++  * [README.Debian]: Documents the source and binary package names,
++      and recommends users to migrate to FreeType 2.
++
++ -- Anthony Fok <foka@debian.org>  Mon, 20 Nov 2000 05:16:13 -0700
++
++freetype (1.3.1-1) unstable; urgency=low
++
++  * New official upstream release.
++  * [contrib/ttf2pfb/ttf2pfb.c]: Applied patch by fellow Debian developer
++      Daniel Jacobowitz to fix a va_arg problem that prevents it from
++      building on powerpc.  Thanks a million!  :-)  (closes: Bug#54539)
++
++ -- Anthony Fok <foka@debian.org>  Mon, 10 Jan 2000 06:12:51 -0700
++
++freetype (1.3.1-0) unstable; urgency=low
++
++  * New upstream release candidate (1999-12-08).
++  * [debian/rules]: Uses "dh_makeshlibs -V 'freetype2 (>= 1.3.1)'"
++      because 1.3 have some new APIs not in 1.2.  Thanks to suggestion
++      by ISHIKAWA Mutsumi <ishikawa@linux.or.jp> (closes: Bug#52319).
++  * Added new entries for Arphic PL fonts in /etc/ttf2pk/ttfonts.map
++  * Modified UBig5.sfd to suit the Big5 Arphic PL fonts.
++
++ -- Anthony Fok <foka@debian.org>  Sun, 12 Dec 1999 11:13:20 -0700
++
++freetype (1.3-2) unstable; urgency=low
++
++  * Corrected the symlink
++    /usr/share/doc/freetype2/changelog.gz -> docs/changes.txt
++    to -> docs/changes.txt.gz.  (Hehe, major oversight.  :-)
++    Thanks to Michael Osamu Shiobara for the bug report.
++    (closes: Bug#50428)
++
++ -- Anthony Fok <foka@debian.org>  Wed, 17 Nov 1999 04:10:41 -0700
++
++freetype (1.3-1) unstable; urgency=low
++
++  * New upstream release (libttf.so.2.2.0) with patches as of 1999-10-21.
++  * Standards-Version: 3.1.0
++  * Removed debian/freetype2-dev.compress because debhelper-2.0.69
++    no longer compresses *.png.
++  * Backed out the patch applied by Anthony Wong <ypwong@debian.org> to
++    contrib/ttf2pfb/configure in freetype_1.2-6.1 because upstream fixed
++    ttf2pfb.c to #include "extend/ftxpost.h" rather than "ftxpost.h".
++    Nonetheless, thanks for the NMU!  :-)
++  * [debian/rules]: FHS-compliancy and general clean-up
++      - s/pre-binary/install/g; and removed install-stamp.
++      - s!usr/doc!usr/share/doc!g;
++      - Referred to the latest /usr/doc/debhelper/examples/rules*
++        and used DH_OPTIONS to reduce clutter.
++      - Oops!  I used bashism but set "SHELL = /bin/sh".  Changed to
++        "SHELL = /bin/bash".  :-)
++      - Install upstream docs/changes.txt as changelog.gz in the
++        freetype2 (shared library) package.
++
++ -- Anthony Fok <foka@debian.org>  Sun, 14 Nov 1999 01:15:21 -0700
++
++freetype (1.2-6.1) unstable; urgency=low
++
++  * Non-maintainer upload (see bug #38813)
++  * Added 'CPPFLAGS= ... -I$srcdir/../../lib/extend' to
++    contrib/ttf2pfb/configure, otherwise compile will fail for
++    ftxpost.h cannot be found.
++  * license.txt.gz is not shipped (lintian complains)
++
++ -- Anthony Wong <ypwong@debian.org>  Thu,  3 Jun 1999 02:04:44 +0800
++
++freetype (1.2-6) unstable; urgency=low
++
++  * Copied debian/postinst to debian/freetype-tools.postinst
++    so mktexlsr is (only) run for the freetype-tools package.
++    Thanks to Andrew for reporting this bug. (closes: Bug#36502)
++  * Added some more font entries to /etc/ttf2pk/ttfonts.map.
++
++ -- Anthony Fok <foka@debian.org>  Thu, 22 Apr 1999 17:54:53 -0600
++
++freetype (1.2-5) unstable; urgency=low
++
++  * Applied upstream freetype-1.2-current.diff.gz as of 1999-04-09.
++  * [contrib/ttf2pfb/t1asm.c]: Incorporated patch for glibc 2.1
++      donated by Hartmut Koptein <koptein@et-inf.fho-emden.de>.
++      (Taken from the t1utils package.  :-)  (closes: Bug#35742)
++  * [contrib/ttf2pk/filesrch.c]: Changed "DllImport" to "KPSEDLL"
++      (changes between kpathsea 3.2 and 3.3).  Thanks Werner!  :-)
++  * [debian/rules]:
++      - Replaced the for loop with a more verbose alternative to ensure
++        make stops when it encounters an error when building one of the
++        contrib programs.
++      - Renamed t1asm to t1asm-freetype, and getafm to getafm-freetype,
++        until they are merged with the ones in t1utils and psutils.
++  * freetype-tools now also Suggests: psutils (>= 1.17-7)
++
++ -- Anthony Fok <foka@debian.org>  Mon, 12 Apr 1999 01:08:23 -0600
++
++freetype (1.2-4) unstable; urgency=low
++
++  * Rebuilt with glibc-2.1 and tetex-lib (shared kpathsea library).
++  * [debian/rules]: Changed usr/share/texmf to usr/lib/texmf
++      for the new FHS-compliant directory layout in teTeX.
++  * [debian/control]: freetype-tools now Suggests: tetex-bin
++      (>= 0.9.990310-1), t1utils (>= 1.2-2)
++
++ -- Anthony Fok <foka@debian.org>  Mon,  5 Apr 1999 16:39:08 -0600
++
++freetype (1.2-3) frozen unstable; urgency=low
++
++  * Applied the upstream freetype-1.2-current.diff.gz as of 1999-01-18
++    which fixes a nasty Raster bug occurs only when clipping very large
++    outlines to a small target bitmap or pixmap.
++
++ -- Anthony Fok <foka@debian.org>  Tue, 19 Jan 1999 22:04:32 -0700
++
++freetype (1.2-2) frozen unstable; urgency=low
++
++  * Applied the upstream freetype-1.2-current.diff.gz as of 1998-12-27
++    Mostly bug fixes.
++  * Added configure.in and Makefile.in for contrib/{ttf2pfb,ttfbanner},
++    so these tools are now included in the freetype-tools package.
++  * [debian/control]:
++      - Removed the "<" and ">", and added a suggestion
++        to Debian-JP's X server with X-TT support in freetype2's
++        package description.
++      - Now freetype-tools also Suggests: t1utils, which contains
++        /usr/bin/t1asm that helps ttf2pfb create real .pfa and .pfb
++        files.  (Also added a note in README.Debian.)
++  * Updated the upstream authors' e-mail addresses in "control" and
++    "copyright."
++  * [debian/changelog]: Add the changelog of the freetype (1.1-0.1)
++      non-maintainer release done by Marcelo E. Magallon
++      <mmagallo@debian.org> in June 1998.  I forgot to do so back
++      then.  Sorry!  :-)
++  * Renamed debian/compress to debian/freetype2-dev.compress, so *.png
++    are no longer compressed to *.png.gz.
++
++ -- Anthony Fok <foka@debian.org>  Tue, 29 Dec 1998 02:16:07 -0700
++
++freetype (1.2-1) frozen unstable; urgency=low
++
++  * New upstream release.
++  * Recompiled with libc6 (2.0.7u-7).
++  * [debian/control]: Updated to standards version 2.5.0.0 (no changes).
++  * [contrib/ttf2pk/configure.in]: Modified the order of the header
++      include paths to ensure that "-I./../../lib" is placed before
++      "-I/usr/include".  Thanks to Roman.Hodek@informatik.uni-erlangen.de
++      for the bug report (forwarded upstream).  (Fixes: #27920)
++
++ -- Anthony Fok <foka@debian.org>  Sat,  5 Dec 1998 15:13:48 -0700
++
++freetype (1.1-1998-09-12-2) unstable; urgency=low
++
++  * [debian/postinst]: Oops, the command "ldconfig" somehow disappeared
++      in the last upload.  Fixed.  :-)
++
++ -- Anthony Fok <foka@debian.org>  Sun, 11 Oct 1998 19:58:32 -0600
++
++freetype (1.1-1998-09-12-1) unstable; urgency=low
++
++  * New upstream development snapshot.
++  * Added "--with-kpathsea-dir=/usr" to ttf2pk's configure.
++  * [debian/rules]:
++      - TTF2PKINPUTS = usr/lib/texmf/ttf2pk
++      - TTF2TFMINPUTS = usr/lib/texmf/ttf2tfm
++      - *.sfd are now installed in $(TTF2PKINPUTS) and $(TTF2TFMINPUTS).
++      - $(TTF2PKINPUTS)/ttfonts.map is a symlink to /etc/ttf2pk/ttfonts.map.
++  * [debian/freetype-tools.conffiles]: Added /etc/ttf2pk/ttfonts.map.
++  * [debian/postinst]: Added #DEBHELPER#.
++  * [debian/freetype-tools.postinst]: Runs /usr/bin/mktexlsr if it exists.
++  * [debian/control]: freetype-tools now Suggests: tetex-bin (>= 0.9-1).
++
++ -- Anthony Fok <foka@debian.org>  Sat, 12 Sep 1998 19:55:17 -0600
++
++freetype (1.1-1998-08-29-1) unstable; urgency=low
++
++  * New upstream development snapshot.
++  * Now installs ttf2bdf and ttf2pk's documentation.
++    ttf2pk/ttf2tfm's *.sfd files are now placed in /usr/lib/ttf2tfm.
++  * changelog.gz now points to the re-added commitlog.gz.
++  * Changed "numGlymphId" to "cmap4->numGlyphId" in lib/extend/ftxcmap.c.
++
++ -- Anthony Fok <foka@debian.org>  Mon, 31 Aug 1998 04:37:57 -0600
++
++freetype (1.1-1) unstable; urgency=low
++
++  * New upstream release.  The old freetype-1.0 source package has been
++    renamed to "freetype1" and is now obsolete.
++  * Upgraded to standards version 2.4.1.0 (no changes).
++  * The package soname has been upgraded from 1 to 2. (libttf.2)
++  * Updated the package descriptions according to freetype.spec.
++  * Since teTeX 0.9 and the new <kpathsea/kpathsea.h> is in Debian,
++    ttf2pk is now compiled and included in freetype-tools.
++  * Added postinst to run ldconfig as per Debian Policy.  (Lintian)
++  * [debian/control]: Added some package relationships w.r.t. freetype1:
++      - freetype2 -- Replaces: freetype1
++      - freetype2-dev -- Conflicts: freetype1-dev
++  * [debian/rules]:
++     - /usr/lib/libttf.la is now installed in the freetype2-dev package.
++     - Moved the developer's documentation into the freetype2-dev package.
++       Thanks to "Marcelo E. Magallon" <mmagallo@debian.org> for suggestion.
++     - Added "--dpkg-shlibdeps-params=-Ldebian/tmp/DEBIAN/shlibs" to
++       dh_shlibdeps when packaging freetype-tools.
++     - Added patch from /usr/doc/lintian/libtool-workarounds.txt
++       to solve the -rpath problem.  Debian's libtool-1.2 handles the -lc
++       problem quite nicely already, so that part of the patch is not used.
++     - Added a GNU GPL copyright statement at the top.  :-)
++  * Ran libtoolize from the Debian libtool-1.2 package.  This solves the
++    -lc problem.  :-)  config.guess and config.sub are taken from the ones
++    in /usr/share/automake/ though because they are newer.  (Thanks to
++    the libtool bug report filed by Jim Pick <jim@jimpick.com> for hints.)
++  * Removed debian/README.Debian.
++
++ -- Anthony Fok <foka@debian.org>  Fri, 28 Aug 1998 03:49:21 -0600
++
++freetype (1.1-0.1) unstable; urgency=low
++
++  * New upstream version. Non-maintainer upload (I need this in order to
++    build new upstream version of gltt!)
++  * Applied patches from previous version.
++  * Applied libtool rpath fix patch and removed rpath from compilation
++    parameters. Changed ltconfig to provide inter-library dependencies.
++  * Upgraded to Standards 2.4.1
++  * Changed package name to freetype2 and other control fields accordingly
++    (this could be a problem... what about packages that depend on
++    freetype1?)
++  * Added "Conflitcs: freetype1 (<= 1.0.0.1998-03-22-1)" to freetype-tools
++    because of the mo files freetype1 contains and that are now in
++    freetype-tools, alogn-side the programs that use the files.
++
++ -- Marcelo E. Magallon <mmagallo@debian.org>  Sat, 27 Jun 1998 15:59:36 -0600
++
++freetype (1.0.0.1998-03-22-1) frozen unstable; urgency=low
++
++  * New upstream snapshot bugfix release as of 1998-03-22.
++     - ttobjs.c: The storage area is now freed in Instance_Destroy,
++       because it's the place it should have been from the very start.
++       A very sick bug spotted by Ram. Thanks again !!     - DavidT
++     - fixed a nasty allocation bug in ttf2tfm.c
++     - corrected a spelling error (strcpy->strcmp) in ttf2pk.c
++     - new email address for Werner Lemberg (wl@gnu.org)
++     - (again) a stupid error fixed in ttf2pk.c
++     - Some fixes to make the package compile smoothless with the make
++       program of Solaris.
++     - too much fixed in po/Makefile.in.in :-)
++  * /usr/doc/freetype/README.gz and /usr/lib/libttf.la are now installed.
++
++ -- Anthony Fok <foka@debian.org>  Wed, 25 Mar 1998 16:18:50 -0700
++
++freetype (1.0.0.1998-03-13-1) unstable; urgency=low
++
++  * New upstream snapshot including upstream patch as of 1998-03-13.
++
++ -- Anthony Fok <foka@debian.org>  Sun, 15 Mar 1998 15:04:10 -0700
++
++freetype (1.0-1) unstable; urgency=low
++
++  * New upstream release (including upstream patch as of 1998-02-17).
++  * Updated copyright and README.Debian.
++  * Upgraded to standards version 2.4.0.0 (no changes).
++  * Enabled gettext support.
++  * Added .PHONY targets in Makefile.in's.
++  * Added -lc for linking libttf.so* (Reported by Lintian).
++  * Various FreeType test programs now have man pages linked to
++    /usr/man/man7/undocumented.7.gz (Reported by Lintian).
++  * debian/control: Revised package description.
++  * debian/rules: Commented out dh_du.
++  * Moved /usr/include/freetype/freetype.h to /usr/include/freetype.h.
++
++ -- Anthony Fok <foka@debian.org>  Wed, 18 Feb 1998 01:12:03 -0700
++
++freetype (0.beta.1998.01.06-1) unstable; urgency=low
++
++  * New upstream snapshot release.
++  * Thanks to the libtool patch posted by Hirotsugu Kakugawa
++    <h.kakugawa@computer.org> on the freetype-devel mailing list
++    (and some local tweaking), the Debian freetype package finally
++    provides the library and header files!  Hurray!  (Fixes Bug#16365)
++  * Splitted the package into freetype0, freetype0-dev and freetype-tools.
++  * Added debian/compress to ensure that /usr/doc/freetype0/image/*.png
++    are not compressed.
++  * Revised README.Debian.
++
++ -- Anthony Fok <foka@debian.org>  Thu,  8 Jan 1998 20:46:14 -0700
++
++freetype (0.beta.1997.12.25-1) unstable; urgency=low
++
++  * New upstream snapshot release.
++  * Modified /usr/doc/freetype/copyright to include the new license.txt.
++    (Yes, FreeType's license has changed.)
++  * Have a blessed Merry Christmas!
++
++ -- Anthony Fok <foka@debian.org>  Fri, 26 Dec 1997 11:26:25 -0700
++
++freetype (0.beta.1997.12.16-1) unstable; urgency=low
++
++  * New upstream release.
++  * /usr/bin/ttf_{lint,timer,view,zoom} no longer exists.  The upstream
++    authors have renamed them as /usr/bin/{ftlint,fttimer,ftview,ftzoom}
++    and have also added other nifty test programs!  :)
++  * debian/rules: Switched to debhelper.
++  * debian/control: Upgraded Standards-Version to 2.3.0.1 and increased
++    Priority to optional.  :)
++  * Revised /usr/doc/freetype/copyright.  FreeType is now truly DFSG-free!
++    (Fixes Bug#16030)
++  * Revised README.Debian.
++  * Changed my maintainer e-mail address to <foka@debian.org>.  :)
++  * Sorry, the library and header files are not yet included.
++    I have yet to learn how.  :)
++
++ -- Anthony Fok <foka@debian.org>  Wed, 17 Dec 1997 03:02:49 -0700
++
++freetype (0.4-4) unstable; urgency=low
++
++  * Corrected the freetype mailing-list server's address from
++    "@lists.tu-muenchen.de" to "@lists.lrz-muenchen.de" in the files
++    /usr/doc/freetype/readme.1st and license.txt.
++  * Improved the package description and added a URL link to the
++    FreeType Project Home Page
++  * Removed "Keywords", "Primary-site" and "Original-site" from the package's
++    description, but kept "Authors" and "Maintained-by" (Closed bug #12510).
++
++ -- Anthony Fok <foka@gpu.srv.ualberta.ca>  Sun, 21 Sep 1997 18:24:42 -0600
++
++freetype (0.4-3) unstable; urgency=low
++
++  * Rebuilt with both libc6 and xlib6g (Fixes bug #12784).
++  * Updated to Standards-Version: 2.3.0.0.
++
++ -- Anthony Fok <foka@gpu.srv.ualberta.ca>  Wed, 10 Sep 1997 21:57:20 -0600
++
++freetype (0.4-2) unstable; urgency=low
++
++  * Renamed /usr/bin/{lint,timer,view,zoom} to
++    /usr/bin/ttf_{lint,timer,view,zoom} to avoid name conflicts with other
++    programs (Fixes bugs #12096, #12136).
++  * Closed bug #11193 (freetype AR4 available).
++
++ -- Anthony Fok <foka@gpu.srv.ualberta.ca>  Tue, 19 Aug 1997 17:53:32 -0600
++
++freetype (0.4-1) unstable; urgency=low
++
++  * New maintainer.
++  * New upstream release.
++  * Updated to Standards-Version: 2.2.0.0.
++
++ -- Anthony Fok <foka@gpu.srv.ualberta.ca>  Mon, 11 Aug 1997 08:26:17 -0600
++
++freetype (0.3-1) unstable; urgency=low
++
++  * Upstream update. Sadly the envisioned Christmas target of an X truetype
++    rasterizer has been abandoned.
++
++ -- Christoph Lameter <clameter@waterf.org>  Tue, 24 Dec 1996 12:52:24 -0800
++
++freetype (0.1-1) unstable; urgency=low
++
++  * Initial Release.
++
++ -- Christoph Lameter <clameter@waterf.org>  Thu, 7 Nov 1996 11:51:45 -0800
+--- freetype-2.3.11.orig/debian/compat
++++ freetype-2.3.11/debian/compat
+@@ -0,0 +1 @@
++5
+--- freetype-2.3.11.orig/debian/freetype-config.man.sgml
++++ freetype-2.3.11/debian/freetype-config.man.sgml
+@@ -0,0 +1,174 @@
++<!doctype refentry PUBLIC "-//OASIS//DTD DocBook V4.1//EN" [
++
++<!-- Process this file with docbook-to-man to generate an nroff manual
++     page: `docbook-to-man manpage.sgml > manpage.1'.  You may view
++     the manual page with: `docbook-to-man manpage.sgml | nroff -man |
++     less'.  A typical entry in a Makefile or Makefile.am is:
++
++manpage.1: manpage.sgml
++	docbook-to-man $< > $@
++
++    
++	The docbook-to-man binary is found in the docbook-to-man package.
++	Please remember that if you create the nroff version in one of the
++	debian/rules file targets (such as build), you will need to include
++	docbook-to-man in your Build-Depends control field.
++
++  -->
++
++  <!ENTITY dhfirstname "<firstname>Will</firstname>">
++  <!ENTITY dhsurname   "<surname>Newton</surname>">
++  <!ENTITY dhdate      "<date>2005-06-09</date>">
++  <!ENTITY dhsection   "<manvolnum>1</manvolnum>">
++  <!ENTITY dhemail     "<email>will@debian.org</email>">
++  <!ENTITY dhusername  "#USERNAME#">
++  <!ENTITY dhucpackage "<refentrytitle>FREETYPE-CONFIG</refentrytitle>">
++  <!ENTITY dhpackage   "freetype-config">
++
++  <!ENTITY debian      "<productname>Debian</productname>">
++  <!ENTITY gnu         "<acronym>GNU</acronym>">
++]>
++
++<refentry>
++  <refentryinfo>
++    <address>
++      &dhemail;
++    </address>
++    <author>
++      &dhfirstname;
++      &dhsurname;
++    </author>
++    <copyright>
++      <year>2005</year>
++      <holder>&dhusername;</holder>
++    </copyright>
++    &dhdate;
++  </refentryinfo>
++  <refmeta>
++    &dhucpackage;
++
++    &dhsection;
++  </refmeta>
++  <refnamediv>
++    <refname>&dhpackage;</refname>
++
++    <refpurpose>show information about installed freetype2 libraries</refpurpose>
++  </refnamediv>
++  <refsynopsisdiv>
++    <cmdsynopsis>
++      <command>&dhpackage;</command>
++       <arg><option>--prefix</option></arg>
++       <arg><option>--prefix=PREFIX</option></arg>
++       <arg><option>--exec-prefix</option></arg>
++       <arg><option>--exec-prefix=EPREFIX</option></arg>
++       <arg><option>--version</option></arg>
++       <arg><option>--ftversion</option></arg>
++       <arg><option>--libs</option></arg>
++       <arg><option>--libtool</option></arg>
++       <arg><option>--cflags</option></arg>
++    </cmdsynopsis>
++  </refsynopsisdiv>
++  <refsect1>
++    <title>DESCRIPTION</title>
++
++    <para>This manual page documents briefly the
++      <command>&dhpackage;</command> command,</para>
++
++    <para><command>&dhpackage;</command> is a program that shows information
++      about the installed freetype2 libraries.</para>
++
++  </refsect1>
++  <refsect1>
++    <title>OPTIONS</title>
++
++    <para>The following options are supported:</para>
++
++    <variablelist>
++      <varlistentry>
++        <term><option>--prefix</option>
++	<option>--prefix=PREFIX</option>
++        </term>
++        <listitem>
++          <para>Show the prefix freetype2 was built with. The prefix may
++           be overridden by passing the argument PREFIX.</para>
++        </listitem>
++      </varlistentry>
++      <varlistentry>
++        <term><option>--exec-prefix</option>
++	<option>--exec-prefix=EPREFIX</option>
++        </term>
++        <listitem>
++          <para>Show the executable prefix freetype2 was built with. The 
++           executable prefix may be overridden by passing the argument
++           EPREFIX.</para>
++        </listitem>
++      </varlistentry>
++      <varlistentry>
++        <term><option>--version</option>
++        </term>
++        <listitem>
++          <para>Show the libtool version of the installed freetype2.</para>
++        </listitem>
++      </varlistentry>
++      <varlistentry>
++        <term><option>--ftversion</option>
++        </term>
++        <listitem>
++          <para>Show the FreeType version of the installed freetype2.</para>
++        </listitem>
++      </varlistentry>
++      <varlistentry>
++        <term><option>--libs</option>
++        </term>
++        <listitem>
++          <para>Show the compiler flags for linking to the installed freetype2.</para>
++        </listitem>
++      </varlistentry>
++      <varlistentry>
++        <term><option>--libtool</option>
++        </term>
++        <listitem>
++          <para>Show the library name for linking with libtool.</para>
++        </listitem>
++      </varlistentry>
++      <varlistentry>
++        <term><option>--cflags</option>
++        </term>
++        <listitem>
++          <para>Show the compiler flags for compiling against the installed freetype2.</para>
++        </listitem>
++      </varlistentry>
++    </variablelist>
++  </refsect1>
++  <refsect1>
++    <title>AUTHOR</title>
++
++    <para>This manual page was written by &dhusername; &dhemail; for
++      the &debian; system (but may be used by others).  Permission is
++      granted to copy, distribute and/or modify this document under
++      the terms of the <acronym>GNU</acronym> Free Documentation
++      License, Version 1.1 or any later version published by the Free
++      Software Foundation; with no Invariant Sections, no Front-Cover
++      Texts and no Back-Cover Texts.</para>
++
++  </refsect1>
++</refentry>
++
++<!-- Keep this comment at the end of the file
++Local variables:
++mode: sgml
++sgml-omittag:t
++sgml-shorttag:t
++sgml-minimize-attributes:nil
++sgml-always-quote-attributes:t
++sgml-indent-step:2
++sgml-indent-data:t
++sgml-parent-document:nil
++sgml-default-dtd-file:nil
++sgml-exposed-tags:nil
++sgml-local-catalogs:nil
++sgml-local-ecat-files:nil
++End:
++-->
++
++
+--- freetype-2.3.11.orig/debian/copyright
++++ freetype-2.3.11/debian/copyright
+@@ -0,0 +1,357 @@
++This package was Debianized by Christoph Lameter <clameter@waterf.org> on
++Thu, 7 Nov 1996 11:51:45 -0800.  It was then picked up by
++Anthony Fok <foka@debian.org> on Mon, 11 Aug 1997 08:10:02 -0600
++
++It was downloaded from
++    ftp://ftp.freetype.org/freetype/freetype2/
++
++Home Page:
++    http://www.freetype.org/
++
++Upstream Authors:
++
++    The FreeType Project
++        David Turner    <david.turner@freetype.org>
++        Robert Wilhelm  <robert.wilhelm@freetype.org>
++        Werner Lemberg  <werner.lemberg@freetype.org>
++
++    The FreeType 2 auto-hinter
++	Designed and implemented by David Turner under contract
++	for Catharon Productions, Inc.  http://www.catharon.com/
++
++    FreeType font driver for PCF fonts
++	Francesco Zappa Nardelli <francesco.zappa.nardelli@ens.fr>
++
++
++Copyright:
++
++FreeType comes with two licenses from which you can choose the one which
++fits your needs best:
++
++  . The FreeType License, in file `FTL.txt'.
++
++  . The GNU General Public License, in file `/usr/share/common-licenses/GPL'.
++
++The contributed PCF driver comes with a license similar to that of
++X Window System which is compatible to the above two licenses
++(see file src/pcf/readme).
++
++
++The FreeType License, the Catharon Open Source License and the
++license of the contributed PCF driver are listed below:
++
++
++                    The FreeType Project LICENSE
++                    ----------------------------
++
++                            2000-Feb-08
++
++                       Copyright 1996-2000 by
++          David Turner, Robert Wilhelm, and Werner Lemberg
++
++
++
++Introduction
++============
++
++  The FreeType  Project is distributed in  several archive packages;
++  some of them may contain, in addition to the FreeType font engine,
++  various tools and  contributions which rely on, or  relate to, the
++  FreeType Project.
++
++  This  license applies  to all  files found  in such  packages, and
++  which do not  fall under their own explicit  license.  The license
++  affects  thus  the  FreeType   font  engine,  the  test  programs,
++  documentation and makefiles, at the very least.
++
++  This  license   was  inspired  by  the  BSD,   Artistic,  and  IJG
++  (Independent JPEG  Group) licenses, which  all encourage inclusion
++  and  use of  free  software in  commercial  and freeware  products
++  alike.  As a consequence, its main points are that:
++
++    o We don't promise that this software works. However, we will be
++      interested in any kind of bug reports. (`as is' distribution)
++
++    o You can  use this software for whatever you  want, in parts or
++      full form, without having to pay us. (`royalty-free' usage)
++
++    o You may not pretend that  you wrote this software.  If you use
++      it, or  only parts of it,  in a program,  you must acknowledge
++      somewhere  in  your  documentation  that  you  have  used  the
++      FreeType code. (`credits')
++
++  We  specifically  permit  and  encourage  the  inclusion  of  this
++  software, with  or without modifications,  in commercial products.
++  We  disclaim  all warranties  covering  The  FreeType Project  and
++  assume no liability related to The FreeType Project.
++
++
++Legal Terms
++===========
++
++0. Definitions
++--------------
++
++  Throughout this license,  the terms `package', `FreeType Project',
++  and  `FreeType  archive' refer  to  the  set  of files  originally
++  distributed  by the  authors  (David Turner,  Robert Wilhelm,  and
++  Werner Lemberg) as the `FreeType Project', be they named as alpha,
++  beta or final release.
++
++  `You' refers to  the licensee, or person using  the project, where
++  `using' is a generic term including compiling the project's source
++  code as  well as linking it  to form a  `program' or `executable'.
++  This  program is  referred to  as  `a program  using the  FreeType
++  engine'.
++
++  This  license applies  to all  files distributed  in  the original
++  FreeType  Project,   including  all  source   code,  binaries  and
++  documentation,  unless  otherwise  stated   in  the  file  in  its
++  original, unmodified form as  distributed in the original archive.
++  If you are  unsure whether or not a particular  file is covered by
++  this license, you must contact us to verify this.
++
++  The FreeType  Project is copyright (C) 1996-2000  by David Turner,
++  Robert Wilhelm, and Werner Lemberg.  All rights reserved except as
++  specified below.
++
++1. No Warranty
++--------------
++
++  THE FREETYPE PROJECT  IS PROVIDED `AS IS' WITHOUT  WARRANTY OF ANY
++  KIND, EITHER  EXPRESS OR IMPLIED,  INCLUDING, BUT NOT  LIMITED TO,
++  WARRANTIES  OF  MERCHANTABILITY   AND  FITNESS  FOR  A  PARTICULAR
++  PURPOSE.  IN NO EVENT WILL ANY OF THE AUTHORS OR COPYRIGHT HOLDERS
++  BE LIABLE  FOR ANY DAMAGES CAUSED  BY THE USE OR  THE INABILITY TO
++  USE, OF THE FREETYPE PROJECT.
++
++2. Redistribution
++-----------------
++
++  This  license  grants  a  worldwide, royalty-free,  perpetual  and
++  irrevocable right  and license to use,  execute, perform, compile,
++  display,  copy,   create  derivative  works   of,  distribute  and
++  sublicense the  FreeType Project (in  both source and  object code
++  forms)  and  derivative works  thereof  for  any  purpose; and  to
++  authorize others  to exercise  some or all  of the  rights granted
++  herein, subject to the following conditions:
++
++    o Redistribution  of source code  must retain this  license file
++      (`LICENSE.TXT') unaltered; any additions, deletions or changes
++      to   the  original   files  must   be  clearly   indicated  in
++      accompanying  documentation.   The  copyright notices  of  the
++      unaltered, original  files must be preserved in  all copies of
++      source files.
++
++    o Redistribution in binary form must provide a  disclaimer  that
++      states  that  the software is based in part of the work of the
++      FreeType Team,  in  the  distribution  documentation.  We also
++      encourage you to put an URL to the FreeType web page  in  your
++      documentation, though this isn't mandatory.
++
++  These conditions  apply to any  software derived from or  based on
++  the FreeType Project,  not just the unmodified files.   If you use
++  our work, you  must acknowledge us.  However, no  fee need be paid
++  to us.
++
++3. Advertising
++--------------
++
++  Neither the  FreeType authors and  contributors nor you  shall use
++  the name of the  other for commercial, advertising, or promotional
++  purposes without specific prior written permission.
++
++  We suggest,  but do not require, that  you use one or  more of the
++  following phrases to refer  to this software in your documentation
++  or advertising  materials: `FreeType Project',  `FreeType Engine',
++  `FreeType library', or `FreeType Distribution'.
++
++  As  you have  not signed  this license,  you are  not  required to
++  accept  it.   However,  as  the FreeType  Project  is  copyrighted
++  material, only  this license, or  another one contracted  with the
++  authors, grants you  the right to use, distribute,  and modify it.
++  Therefore,  by  using,  distributing,  or modifying  the  FreeType
++  Project, you indicate that you understand and accept all the terms
++  of this license.
++
++4. Contacts
++-----------
++
++  There are two mailing lists related to FreeType:
++
++    o freetype@freetype.org
++
++      Discusses general use and applications of FreeType, as well as
++      future and  wanted additions to the  library and distribution.
++      If  you are looking  for support,  start in  this list  if you
++      haven't found anything to help you in the documentation.
++
++    o devel@freetype.org
++
++      Discusses bugs,  as well  as engine internals,  design issues,
++      specific licenses, porting, etc.
++
++    o http://www.freetype.org
++
++      Holds the current  FreeType web page, which will  allow you to
++      download  our  latest  development  version  and  read  online
++      documentation.
++
++  You can also contact us individually at:
++
++    David Turner      <david.turner@freetype.org>
++    Robert Wilhelm    <robert.wilhelm@freetype.org>
++    Werner Lemberg    <werner.lemberg@freetype.org>
++
++
++--- end of LICENSE.TXT ---
++
++
++                  The Catharon Open Source LICENSE
++                    ----------------------------
++
++                            2000-Jul-04
++
++          Copyright (C) 2000 by Catharon Productions, Inc.
++
++
++
++Introduction
++============
++
++  This  license  applies to  source  files  distributed by  Catharon
++  Productions,  Inc.  in  several  archive packages.   This  license
++  applies  to all files  found in  such packages  which do  not fall
++  under their own explicit license.
++
++  This  license   was  inspired  by  the  BSD,   Artistic,  and  IJG
++  (Independent JPEG  Group) licenses, which  all encourage inclusion
++  and  use of  free  software in  commercial  and freeware  products
++  alike.  As a consequence, its main points are that:
++
++    o We  don't promise that  this software works.  However,  we are
++      interested in any kind of bug reports. (`as is' distribution)
++
++    o You can  use this software for whatever you  want, in parts or
++      full form, without having to pay us. (`royalty-free' usage)
++
++    o You may not pretend that  you wrote this software.  If you use
++      it, or  only parts of it,  in a program,  you must acknowledge
++      somewhere  in  your  documentation  that  you  have  used  the
++      Catharon Code. (`credits')
++
++  We  specifically  permit  and  encourage  the  inclusion  of  this
++  software, with  or without modifications,  in commercial products.
++  We disclaim  all warranties  covering the packages  distributed by
++  Catharon  Productions, Inc.  and  assume no  liability related  to
++  their use.
++
++
++Legal Terms
++===========
++
++0. Definitions
++--------------
++
++  Throughout this license,  the terms `Catharon Package', `package',
++  and  `Catharon  Code'  refer   to  the  set  of  files  originally
++  distributed by Catharon Productions, Inc.
++
++  `You' refers to  the licensee, or person using  the project, where
++  `using' is a generic term including compiling the project's source
++  code as  well as linking it  to form a  `program' or `executable'.
++  This  program  is referred  to  as `a  program  using  one of  the
++  Catharon Packages'.
++
++  This  license applies  to all  files distributed  in  the original
++  Catharon  Package(s),  including  all  source code,  binaries  and
++  documentation,  unless  otherwise  stated   in  the  file  in  its
++  original, unmodified form as  distributed in the original archive.
++  If you are  unsure whether or not a particular  file is covered by
++  this license, you must contact us to verify this.
++
++  The  Catharon   Packages  are  copyright  (C)   2000  by  Catharon
++  Productions, Inc.  All rights reserved except as specified below.
++
++1. No Warranty
++--------------
++
++  THE CATHARON PACKAGES ARE PROVIDED `AS IS' WITHOUT WARRANTY OF ANY
++  KIND, EITHER  EXPRESS OR IMPLIED,  INCLUDING, BUT NOT  LIMITED TO,
++  WARRANTIES  OF  MERCHANTABILITY   AND  FITNESS  FOR  A  PARTICULAR
++  PURPOSE.  IN NO EVENT WILL ANY OF THE AUTHORS OR COPYRIGHT HOLDERS
++  BE LIABLE FOR ANY DAMAGES CAUSED BY THE USE OF OR THE INABILITY TO
++  USE THE CATHARON PACKAGE.
++
++2. Redistribution
++-----------------
++
++  This  license  grants  a  worldwide, royalty-free,  perpetual  and
++  irrevocable right  and license to use,  execute, perform, compile,
++  display,  copy,   create  derivative  works   of,  distribute  and
++  sublicense the  Catharon Packages (in both source  and object code
++  forms)  and  derivative works  thereof  for  any  purpose; and  to
++  authorize others  to exercise  some or all  of the  rights granted
++  herein, subject to the following conditions:
++
++    o Redistribution  of source code  must retain this  license file
++      (`license.txt') unaltered; any additions, deletions or changes
++      to   the  original   files  must   be  clearly   indicated  in
++      accompanying  documentation.   The  copyright notices  of  the
++      unaltered, original  files must be preserved in  all copies of
++      source files.
++
++    o Redistribution  in binary form must provide  a disclaimer that
++      states  that the  software is  based in  part on  the  work of
++      Catharon Productions, Inc. in the distribution documentation.
++
++  These conditions  apply to any  software derived from or  based on
++  the Catharon Packages, not just  the unmodified files.  If you use
++  our work, you  must acknowledge us.  However, no  fee need be paid
++  to us.
++
++3. Advertising
++--------------
++
++  Neither Catharon Productions, Inc.  and contributors nor you shall
++  use  the  name  of  the  other  for  commercial,  advertising,  or
++  promotional purposes without specific prior written permission.
++
++  We suggest, but do not  require, that you use the following phrase
++  to refer to this software in your documentation: 'this software is
++  based in part on the Catharon Typography Project'.
++
++  As  you have  not signed  this license,  you are  not  required to
++  accept  it.  However,  as  the Catharon  Packages are  copyrighted
++  material, only  this license, or  another one contracted  with the
++  authors, grants you  the right to use, distribute,  and modify it.
++  Therefore,  by  using,  distributing,  or modifying  the  Catharon
++  Packages,  you indicate  that you  understand and  accept  all the
++  terms of this license.
++
++--- end of license.txt ---
++
++
++License for FreeType font driver for PCF fonts
++*******
++
++Copyright (C) 2000 by Francesco Zappa Nardelli
++
++Permission is hereby granted, free of charge, to any person obtaining
++a copy of this software and associated documentation files (the
++"Software"), to deal in the Software without restriction, including
++without limitation the rights to use, copy, modify, merge, publish,
++distribute, sublicense, and/or sell copies of the Software, and to
++permit persons to whom the Software is furnished to do so, subject to
++the following conditions:
++
++The above copyright notice and this permission notice shall be
++included in all copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
++IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
++CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
++TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
++SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+--- freetype-2.3.11.orig/debian/libfreetype6-udeb.dirs
++++ freetype-2.3.11/debian/libfreetype6-udeb.dirs
+@@ -0,0 +1 @@
++usr/lib
+--- freetype-2.3.11.orig/debian/control
++++ freetype-2.3.11/debian/control
+@@ -0,0 +1,85 @@
++Source: freetype
++Section: libs
++Priority: optional
++Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
++XSBC-Original-Maintainer: Steve Langasek <vorlon@debian.org>
++Uploaders: Anthony Fok <foka@debian.org>, Keith Packard <keithp@keithp.com>
++Build-Depends: bzip2, debhelper (>= 5.0.22), docbook-to-man, gettext (>= 0.10.36-2), libx11-dev, x11proto-core-dev, libz-dev, quilt
++Standards-Version: 3.8.0
++
++Package: libfreetype6
++Architecture: any
++Section: libs
++Depends: ${shlibs:Depends}
++Conflicts: freetype, xpdf-reader (<< 1.00-4)
++Description: FreeType 2 font engine, shared library files
++ The FreeType project is a team of volunteers who develop free,
++ portable and high-quality software solutions for digital typography. 
++ They specifically target embedded systems and focus on bringing small,
++ efficient and ubiquitous products.
++ .
++ The FreeType 2 library is their new software font engine.  It has been
++ designed to provide the following important features:
++  * A universal and simple API to manage font files
++  * Support for several font formats through loadable modules
++  * High-quality anti-aliasing
++  * High portability & performance
++ .
++ Supported font formats include:
++  * TrueType files (.ttf) and collections (.ttc)
++  * Type 1 font files both in ASCII (.pfa) or binary (.pfb) format
++  * Type 1 Multiple Master fonts.  The FreeType 2 API also provides
++    routines to manage design instances easily
++  * Type 1 CID-keyed fonts
++  * OpenType/CFF (.otf) fonts
++  * CFF/Type 2 fonts
++  * Adobe CEF fonts (.cef), used to embed fonts in SVG documents with
++    the Adobe SVG viewer plugin.
++  * Windows FNT/FON bitmap fonts
++ .
++ This package contains the files needed to run programs that use the
++ FreeType 2 library.
++ .
++  Home Page: http://www.freetype.org/
++  Authors: David Turner   <david.turner@freetype.org>
++           Robert Wilhelm <robert.wilhelm@freetype.org>
++           Werner Lemberg <werner.lemberg@freetype.org>
++
++Package: libfreetype6-dev
++Architecture: any
++Section: libdevel
++Depends: libfreetype6 (= ${binary:Version}), libc6-dev | libc-dev, zlib1g-dev | libz-dev
++Conflicts: freetype0-dev, freetype1 (<= 1.0.0.1998-03-22-1), freetype1-dev
++Replaces: freetype0-dev, freetype1-dev
++Description: FreeType 2 font engine, development files
++ The FreeType project is a team of volunteers who develop free,
++ portable and high-quality software solutions for digital typography. 
++ They specifically target embedded systems and focus on bringing small,
++ efficient and ubiquitous products.
++ .
++ This package contains all supplementary files (static library, headers
++ and documentation) you need to develop your own programs using the
++ FreeType 2 library.
++
++Package: freetype2-demos
++Architecture: any
++Section: utils
++Depends: ${shlibs:Depends}
++Replaces: freetype-tools
++Description: FreeType 2 demonstration programs
++ This package contains some demonstration programs and utilities
++ which showcase the features of the FreeType 2 font engine.
++
++Package: libfreetype6-udeb
++XC-Package-Type: udeb
++Priority: extra
++Architecture: any
++Depends: ${shlibs:Depends}
++Section: debian-installer
++Description: FreeType 2 font engine for the debian-installer
++ The FreeType project is a team of volunteers who develop free,
++ portable and high-quality software solutions for digital typography.
++ They specifically target embedded systems and focus on bringing small,
++ efficient and ubiquitous products.
++ .
++ This is the udeb package for use with the debian-installer.
+--- freetype-2.3.11.orig/debian/libfreetype6.symbols
++++ freetype-2.3.11/debian/libfreetype6.symbols
+@@ -0,0 +1,355 @@
++libfreetype.so.6 libfreetype6 #MINVER#
++ FTC_CMapCache_Lookup@Base 2.2.1
++ FTC_CMapCache_New@Base 2.2.1
++ FTC_ImageCache_Lookup@Base 2.2.1
++ FTC_ImageCache_LookupScaler@Base 2.3.5
++ FTC_ImageCache_New@Base 2.2.1
++ FTC_Image_Cache_Lookup@Base 2.2.1
++ FTC_Image_Cache_New@Base 2.2.1
++ FTC_Manager_Done@Base 2.2.1
++ FTC_Manager_LookupFace@Base 2.2.1
++ FTC_Manager_LookupSize@Base 2.2.1
++ FTC_Manager_Lookup_Face@Base 2.2.1
++ FTC_Manager_Lookup_Size@Base 2.2.1
++ FTC_Manager_New@Base 2.2.1
++ FTC_Manager_RemoveFaceID@Base 2.2.1
++ FTC_Manager_Reset@Base 2.2.1
++ FTC_Node_Unref@Base 2.2.1
++ FTC_SBitCache_Lookup@Base 2.2.1
++ FTC_SBitCache_LookupScaler@Base 2.3.5
++ FTC_SBitCache_New@Base 2.2.1
++ FTC_SBit_Cache_Lookup@Base 2.2.1
++ FTC_SBit_Cache_New@Base 2.2.1
++ FT_Access_Frame@Base 2.2.1
++ FT_Activate_Size@Base 2.2.1
++ FT_Add_Default_Modules@Base 2.2.1
++ FT_Add_Module@Base 2.2.1
++ FT_Alloc@Base 2.2.1
++ FT_Angle_Diff@Base 2.2.1
++ FT_Atan2@Base 2.2.1
++ FT_Attach_File@Base 2.2.1
++ FT_Attach_Stream@Base 2.2.1
++ FT_Bitmap_Convert@Base 2.2.1
++ FT_Bitmap_Copy@Base 2.2.1
++ FT_Bitmap_Done@Base 2.2.1
++ FT_Bitmap_Embolden@Base 2.2.1
++ FT_Bitmap_New@Base 2.2.1
++ FT_CMap_Done@Base 2.2.1
++ FT_CMap_New@Base 2.2.1
++ FT_CeilFix@Base 2.2.1
++ FT_ClassicKern_Free@Base 2.2.1
++ FT_ClassicKern_Validate@Base 2.2.1
++ FT_Cos@Base 2.2.1
++ FT_DivFix@Base 2.2.1
++ FT_Done_Face@Base 2.2.1
++ FT_Done_FreeType@Base 2.2.1
++ FT_Done_Glyph@Base 2.2.1
++ FT_Done_GlyphSlot@Base 2.2.1
++ FT_Done_Library@Base 2.2.1
++ FT_Done_Memory@Base 2.2.1
++ FT_Done_Size@Base 2.2.1
++ FT_Extract_Frame@Base 2.2.1
++ FT_Face_CheckTrueTypePatents@Base 2.3.5
++ FT_Face_GetCharVariantIndex@Base 2.3.5
++ FT_Face_GetCharVariantIsDefault@Base 2.3.5
++ FT_Face_GetCharsOfVariant@Base 2.3.5
++ FT_Face_GetVariantSelectors@Base 2.3.5
++ FT_Face_GetVariantsOfChar@Base 2.3.5
++ FT_Face_SetUnpatentedHinting@Base 2.3.5
++ FT_FloorFix@Base 2.2.1
++ FT_Forget_Frame@Base 2.2.1
++ FT_Free@Base 2.2.1
++ FT_Get_Advance@Base 2.3.9
++ FT_Get_Advances@Base 2.3.9
++ FT_Get_BDF_Charset_ID@Base 2.2.1
++ FT_Get_BDF_Property@Base 2.2.1
++ FT_Get_CID_From_Glyph_Index@Base 2.3.9
++ FT_Get_CID_Is_Internally_CID_Keyed@Base 2.3.9
++ FT_Get_CID_Registry_Ordering_Supplement@Base 2.3.5
++ FT_Get_CMap_Format@Base 2.3.5
++ FT_Get_CMap_Language_ID@Base 2.2.1
++ FT_Get_Char_Index@Base 2.2.1
++ FT_Get_Charmap_Index@Base 2.2.1
++ FT_Get_FSType_Flags@Base 2.3.9
++ FT_Get_First_Char@Base 2.2.1
++ FT_Get_Gasp@Base 2.3.5
++ FT_Get_Glyph@Base 2.2.1
++ FT_Get_Glyph_Name@Base 2.2.1
++ FT_Get_Kerning@Base 2.2.1
++ FT_Get_Long@Base 2.2.1
++ FT_Get_MM_Var@Base 2.2.1
++ FT_Get_Module@Base 2.2.1
++ FT_Get_Module_Interface@Base 2.2.1
++ FT_Get_Multi_Master@Base 2.2.1
++ FT_Get_Name_Index@Base 2.2.1
++ FT_Get_Next_Char@Base 2.2.1
++ FT_Get_PFR_Advance@Base 2.2.1
++ FT_Get_PFR_Kerning@Base 2.2.1
++ FT_Get_PFR_Metrics@Base 2.2.1
++ FT_Get_PS_Font_Info@Base 2.2.1
++ FT_Get_PS_Font_Private@Base 2.2.1
++ FT_Get_Postscript_Name@Base 2.2.1
++ FT_Get_Renderer@Base 2.2.1
++ FT_Get_Sfnt_Name@Base 2.2.1
++ FT_Get_Sfnt_Name_Count@Base 2.2.1
++ FT_Get_Sfnt_Table@Base 2.2.1
++ FT_Get_Short@Base 2.2.1
++ FT_Get_SubGlyph_Info@Base 2.2.1
++ FT_Get_Track_Kerning@Base 2.2.1
++ FT_Get_TrueType_Engine_Type@Base 2.2.1
++ FT_Get_WinFNT_Header@Base 2.2.1
++ FT_Get_X11_Font_Format@Base 2.2.1
++ FT_GlyphLoader_Add@Base 2.2.1
++ FT_GlyphLoader_CheckPoints@Base 2.2.1
++ FT_GlyphLoader_CheckSubGlyphs@Base 2.2.1
++ FT_GlyphLoader_CopyPoints@Base 2.2.1
++ FT_GlyphLoader_CreateExtra@Base 2.2.1
++ FT_GlyphLoader_Done@Base 2.2.1
++ FT_GlyphLoader_New@Base 2.2.1
++ FT_GlyphLoader_Prepare@Base 2.2.1
++ FT_GlyphLoader_Reset@Base 2.2.1
++ FT_GlyphLoader_Rewind@Base 2.2.1
++ FT_GlyphSlot_Embolden@Base 2.2.1
++ FT_GlyphSlot_Oblique@Base 2.2.1
++ FT_GlyphSlot_Own_Bitmap@Base 2.2.1
++ FT_Glyph_Copy@Base 2.2.1
++ FT_Glyph_Get_CBox@Base 2.2.1
++ FT_Glyph_Stroke@Base 2.2.1
++ FT_Glyph_StrokeBorder@Base 2.2.1
++ FT_Glyph_To_Bitmap@Base 2.2.1
++ FT_Glyph_Transform@Base 2.2.1
++ FT_Has_PS_Glyph_Names@Base 2.2.1
++ FT_Init_FreeType@Base 2.2.1
++ FT_Library_SetLcdFilter@Base 2.3.5
++ FT_Library_Version@Base 2.2.1
++ FT_List_Add@Base 2.2.1
++ FT_List_Finalize@Base 2.2.1
++ FT_List_Find@Base 2.2.1
++ FT_List_Insert@Base 2.2.1
++ FT_List_Iterate@Base 2.2.1
++ FT_List_Remove@Base 2.2.1
++ FT_List_Up@Base 2.2.1
++ FT_Load_Char@Base 2.2.1
++ FT_Load_Glyph@Base 2.2.1
++ FT_Load_Sfnt_Table@Base 2.2.1
++ FT_Lookup_Renderer@Base 2.2.1
++ FT_Match_Size@Base 2.2.1
++ FT_Matrix_Invert@Base 2.2.1
++ FT_Matrix_Multiply@Base 2.2.1
++ FT_Matrix_Multiply_Scaled@Base 2.3.5
++ FT_MulDiv@Base 2.2.1
++ FT_MulDiv_No_Round@Base 2.2.1
++ FT_MulFix@Base 2.2.1
++ FT_New_Face@Base 2.2.1
++ FT_New_GlyphSlot@Base 2.2.1
++ FT_New_Library@Base 2.2.1
++ FT_New_Memory@Base 2.2.1
++ FT_New_Memory_Face@Base 2.2.1
++ FT_New_Memory_Stream@Base 2.2.1
++ FT_New_Size@Base 2.2.1
++ FT_OpenType_Free@Base 2.2.1
++ FT_OpenType_Validate@Base 2.2.1
++ FT_Open_Face@Base 2.2.1
++ FT_Outline_Check@Base 2.2.1
++ FT_Outline_Copy@Base 2.2.1
++ FT_Outline_Decompose@Base 2.2.1
++ FT_Outline_Done@Base 2.2.1
++ FT_Outline_Done_Internal@Base 2.2.1
++ FT_Outline_Embolden@Base 2.2.1
++ FT_Outline_GetInsideBorder@Base 2.2.1
++ FT_Outline_GetOutsideBorder@Base 2.2.1
++ FT_Outline_Get_BBox@Base 2.2.1
++ FT_Outline_Get_Bitmap@Base 2.2.1
++ FT_Outline_Get_CBox@Base 2.2.1
++ FT_Outline_Get_Orientation@Base 2.2.1
++ FT_Outline_New@Base 2.2.1
++ FT_Outline_New_Internal@Base 2.2.1
++ FT_Outline_Render@Base 2.2.1
++ FT_Outline_Reverse@Base 2.2.1
++ FT_Outline_Transform@Base 2.2.1
++ FT_Outline_Translate@Base 2.2.1
++ FT_QAlloc@Base 2.2.1
++ FT_QRealloc@Base 2.2.1
++ FT_Raccess_Get_DataOffsets@Base 2.2.1
++ FT_Raccess_Get_HeaderInfo@Base 2.2.1
++ FT_Raccess_Guess@Base 2.2.1
++ FT_Read_Stream@Base 2.2.1
++ FT_Read_Stream_At@Base 2.2.1
++ FT_Realloc@Base 2.2.1
++ FT_Release_Frame@Base 2.2.1
++ FT_Remove_Module@Base 2.2.1
++ FT_Render_Glyph@Base 2.2.1
++ FT_Render_Glyph_Internal@Base 2.2.1
++ FT_Request_Metrics@Base 2.2.1
++ FT_Request_Size@Base 2.2.1
++ FT_RoundFix@Base 2.2.1
++ FT_Seek_Stream@Base 2.2.1
++ FT_Select_Charmap@Base 2.2.1
++ FT_Select_Metrics@Base 2.2.1
++ FT_Select_Size@Base 2.2.1
++ FT_Set_Char_Size@Base 2.2.1
++ FT_Set_Charmap@Base 2.2.1
++ FT_Set_Debug_Hook@Base 2.2.1
++ FT_Set_MM_Blend_Coordinates@Base 2.2.1
++ FT_Set_MM_Design_Coordinates@Base 2.2.1
++ FT_Set_Pixel_Sizes@Base 2.2.1
++ FT_Set_Renderer@Base 2.2.1
++ FT_Set_Transform@Base 2.2.1
++ FT_Set_Var_Blend_Coordinates@Base 2.2.1
++ FT_Set_Var_Design_Coordinates@Base 2.2.1
++ FT_Sfnt_Table_Info@Base 2.2.1
++ FT_Sin@Base 2.2.1
++ FT_Skip_Stream@Base 2.2.1
++ FT_Sqrt32@Base 2.2.1
++ FT_SqrtFixed@Base 2.2.1
++ FT_Stream_Close@Base 2.2.1
++ FT_Stream_EnterFrame@Base 2.2.1
++ FT_Stream_ExitFrame@Base 2.2.1
++ FT_Stream_ExtractFrame@Base 2.2.1
++ FT_Stream_Free@Base 2.2.1
++ FT_Stream_GetChar@Base 2.2.1
++ FT_Stream_GetLong@Base 2.2.1
++ FT_Stream_GetLongLE@Base 2.2.1
++ FT_Stream_GetOffset@Base 2.2.1
++ FT_Stream_GetShort@Base 2.2.1
++ FT_Stream_GetShortLE@Base 2.2.1
++ FT_Stream_New@Base 2.2.1
++ FT_Stream_Open@Base 2.2.1
++ FT_Stream_OpenGzip@Base 2.2.1
++ FT_Stream_OpenLZW@Base 2.2.1
++ FT_Stream_OpenMemory@Base 2.2.1
++ FT_Stream_Pos@Base 2.2.1
++ FT_Stream_Read@Base 2.2.1
++ FT_Stream_ReadAt@Base 2.2.1
++ FT_Stream_ReadChar@Base 2.2.1
++ FT_Stream_ReadFields@Base 2.2.1
++ FT_Stream_ReadLong@Base 2.2.1
++ FT_Stream_ReadLongLE@Base 2.2.1
++ FT_Stream_ReadOffset@Base 2.2.1
++ FT_Stream_ReadShort@Base 2.2.1
++ FT_Stream_ReadShortLE@Base 2.2.1
++ FT_Stream_ReleaseFrame@Base 2.2.1
++ FT_Stream_Seek@Base 2.2.1
++ FT_Stream_Skip@Base 2.2.1
++ FT_Stream_TryRead@Base 2.2.1
++ FT_Stroker_BeginSubPath@Base 2.2.1
++ FT_Stroker_ConicTo@Base 2.2.1
++ FT_Stroker_CubicTo@Base 2.2.1
++ FT_Stroker_Done@Base 2.2.1
++ FT_Stroker_EndSubPath@Base 2.2.1
++ FT_Stroker_Export@Base 2.2.1
++ FT_Stroker_ExportBorder@Base 2.2.1
++ FT_Stroker_GetBorderCounts@Base 2.2.1
++ FT_Stroker_GetCounts@Base 2.2.1
++ FT_Stroker_LineTo@Base 2.2.1
++ FT_Stroker_New@Base 2.2.1
++ FT_Stroker_ParseOutline@Base 2.2.1
++ FT_Stroker_Rewind@Base 2.2.1
++ FT_Stroker_Set@Base 2.2.1
++ FT_Tan@Base 2.2.1
++ FT_Trace_Get_Count@Base 2.2.1
++ FT_Trace_Get_Name@Base 2.2.1
++ FT_TrueTypeGX_Free@Base 2.2.1
++ FT_TrueTypeGX_Validate@Base 2.2.1
++ FT_Vector_From_Polar@Base 2.2.1
++ FT_Vector_Length@Base 2.2.1
++ FT_Vector_Polarize@Base 2.2.1
++ FT_Vector_Rotate@Base 2.2.1
++ FT_Vector_Transform@Base 2.2.1
++ FT_Vector_Transform_Scaled@Base 2.3.5
++ FT_Vector_Unit@Base 2.2.1
++ TT_New_Context@Base 2.2.1
++ TT_RunIns@Base 2.2.1
++ af_autofitter_service@Base 2.2.1
++ af_cjk_script_class@Base 2.2.1
++ af_dummy_script_class@Base 2.2.1
++ af_glyph_hints_dump_edges@Base 2.3.5
++ af_glyph_hints_dump_points@Base 2.3.5
++ af_glyph_hints_dump_segments@Base 2.3.5
++ af_indic_script_class@Base 2.3.5
++ af_latin_script_class@Base 2.2.1
++ afm_parser_funcs@Base 2.2.1
++ autofit_module_class@Base 2.2.1
++ bdf_cmap_class@Base 2.2.1
++ bdf_driver_class@Base 2.2.1
++ cff_cmap_encoding_class_rec@Base 2.2.1
++ cff_cmap_unicode_class_rec@Base 2.2.1
++ cff_driver_class@Base 2.2.1
++ ft_bitmap_glyph_class@Base 2.2.1
++ ft_corner_is_flat@Base 2.3.5
++ ft_corner_orientation@Base 2.3.5
++ ft_debug_init@Base 2.2.1
++ ft_glyphslot_alloc_bitmap@Base 2.2.1
++ ft_glyphslot_free_bitmap@Base 2.2.1
++ ft_glyphslot_set_bitmap@Base 2.2.1
++ ft_grays_raster@Base 2.2.1
++ ft_highpow2@Base 2.2.1
++ ft_lzwstate_done@Base 2.2.1
++ ft_lzwstate_init@Base 2.2.1
++ ft_lzwstate_io@Base 2.2.1
++ ft_lzwstate_reset@Base 2.2.1
++ ft_mem_alloc@Base 2.2.1
++ ft_mem_dup@Base 2.3.5
++ ft_mem_free@Base 2.2.1
++ ft_mem_qalloc@Base 2.2.1
++ ft_mem_qrealloc@Base 2.2.1
++ ft_mem_realloc@Base 2.2.1
++ ft_mem_strcpyn@Base 2.3.5
++ ft_mem_strdup@Base 2.3.5
++ ft_module_get_service@Base 2.2.1
++ ft_outline_glyph_class@Base 2.2.1
++ ft_raster1_renderer_class@Base 2.2.1
++ ft_raster5_renderer_class@Base 2.2.1
++ ft_service_list_lookup@Base 2.2.1
++ ft_smooth_lcd_renderer_class@Base 2.2.1
++ ft_smooth_lcdv_renderer_class@Base 2.2.1
++ ft_smooth_renderer_class@Base 2.2.1
++ ft_standard_raster@Base 2.2.1
++ ft_stub_set_char_sizes@Base 2.2.1
++ ft_stub_set_pixel_sizes@Base 2.2.1
++ ft_synthesize_vertical_metrics@Base 2.2.1
++ ft_validator_error@Base 2.2.1
++ ft_validator_init@Base 2.2.1
++ ft_validator_run@Base 2.2.1
++ ftc_basic_image_cache_class@Base 2.2.1
++ ftc_basic_image_family_class@Base 2.2.1
++ ftc_basic_sbit_cache_class@Base 2.2.1
++ ftc_basic_sbit_family_class@Base 2.2.1
++ ftc_cmap_cache_class@Base 2.2.1
++ ftc_face_list_class@Base 2.2.1
++ ftc_node_destroy@Base 2.2.1
++ ftc_size_list_class@Base 2.2.1
++ pcf_cmap_class@Base 2.2.1
++ pcf_driver_class@Base 2.2.1
++ pfr_cmap_class_rec@Base 2.2.1
++ pfr_driver_class@Base 2.2.1
++ pfr_metrics_service_rec@Base 2.2.1
++ ps_hints_apply@Base 2.2.1
++ ps_parser_funcs@Base 2.2.1
++ ps_table_funcs@Base 2.2.1
++ psaux_module_class@Base 2.2.1
++ pshinter_module_class@Base 2.2.1
++ psnames_module_class@Base 2.2.1
++ sfnt_module_class@Base 2.2.1
++ t1_builder_funcs@Base 2.2.1
++ t1_cmap_classes@Base 2.2.1
++ t1_cmap_custom_class_rec@Base 2.2.1
++ t1_cmap_expert_class_rec@Base 2.2.1
++ t1_cmap_standard_class_rec@Base 2.2.1
++ t1_cmap_unicode_class_rec@Base 2.2.1
++ t1_decoder_funcs@Base 2.2.1
++ t1_driver_class@Base 2.2.1
++ t1cid_driver_class@Base 2.2.1
++ t42_driver_class@Base 2.2.1
++ tt_cmap0_class_rec@Base 2.2.1
++ tt_cmap10_class_rec@Base 2.2.1
++ tt_cmap12_class_rec@Base 2.2.1
++ tt_cmap13_class_rec@Base 2.3.11
++ tt_cmap14_class_rec@Base 2.3.5
++ tt_cmap2_class_rec@Base 2.2.1
++ tt_cmap4_class_rec@Base 2.2.1
++ tt_cmap6_class_rec@Base 2.2.1
++ tt_cmap8_class_rec@Base 2.2.1
++ tt_default_graphics_state@Base 2.2.1
++ tt_driver_class@Base 2.2.1
++ winfnt_driver_class@Base 2.2.1
+--- freetype-2.3.11.orig/debian/libfreetype6.files
++++ freetype-2.3.11/debian/libfreetype6.files
+@@ -0,0 +1 @@
++usr/lib/*.so.*
+--- freetype-2.3.11.orig/debian/patches-freetype/CVE-2010-2498.patch
++++ freetype-2.3.11/debian/patches-freetype/CVE-2010-2498.patch
+@@ -0,0 +1,31 @@
++Description: fix denial of service and possible code execution via invalid free
++Bug: http://savannah.nongnu.org/bugs/index.php?30106
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2.git/commit/?id=8d22746c9e5af80ff4304aef440986403a5072e2
++
++Index: freetype-2.3.11/src/pshinter/pshalgo.c
++===================================================================
++--- freetype-2.3.11.orig/src/pshinter/pshalgo.c	2010-07-15 08:30:32.000000000 -0400
+++++ freetype-2.3.11/src/pshinter/pshalgo.c	2010-07-15 08:30:46.000000000 -0400
++@@ -1690,7 +1690,10 @@
++     /* process secondary hints to `selected' points */
++     if ( num_masks > 1 && glyph->num_points > 0 )
++     {
++-      first = mask->end_point;
+++      /* the `endchar' op can reduce the number of points */
+++      first = mask->end_point > glyph->num_points
+++                ? glyph->num_points
+++                : mask->end_point;
++       mask++;
++       for ( ; num_masks > 1; num_masks--, mask++ )
++       {
++@@ -1698,7 +1701,9 @@
++         FT_Int   count;
++ 
++ 
++-        next  = mask->end_point;
+++        next  = mask->end_point > glyph->num_points
+++                  ? glyph->num_points
+++                  : mask->end_point;
++         count = next - first;
++         if ( count > 0 )
++         {
+--- freetype-2.3.11.orig/debian/patches-freetype/series
++++ freetype-2.3.11/debian/patches-freetype/series
+@@ -0,0 +1,18 @@
++freetype-bytecode-interpreter.patch -p0
++freetype-2.1.7-backwards.compat.patch -p0
++freetype-bdflib-large-encodings.patch -p0
++331-hmtx-no-shorts.diff
++enable-full-bytecode-interpreter
++enable-subpixel-rendering.patch
++uninitialized-vars.patch
++CVE-2010-2498.patch
++CVE-2010-2499.patch
++CVE-2010-2500.patch
++CVE-2010-2519.patch
++CVE-2010-2520.patch
++CVE-2010-1797.patch
++CVE-2010-2805.patch
++CVE-2010-2806.patch
++CVE-2010-2807.patch
++CVE-2010-2808.patch
++bug30135.patch
+--- freetype-2.3.11.orig/debian/patches-freetype/CVE-2010-1797.patch
++++ freetype-2.3.11/debian/patches-freetype/CVE-2010-1797.patch
+@@ -0,0 +1,21 @@
++Description: fix possible arbitrary code execution via buffer overflow
++ in CFF Type2 CharStrings interpreter
++Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/freetype/+bug/617019
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2.git/commit/?id=11d65e8a1f1f14e56148fd991965424d9bd1cdbc
++
++Index: freetype-2.3.11/src/cff/cffgload.c
++===================================================================
++--- freetype-2.3.11.orig/src/cff/cffgload.c	2010-08-13 08:20:35.000000000 -0400
+++++ freetype-2.3.11/src/cff/cffgload.c	2010-08-13 08:20:49.000000000 -0400
++@@ -2358,7 +2358,10 @@
++           return CFF_Err_Unimplemented_Feature;
++         }
++ 
++-      decoder->top = args;
+++        decoder->top = args;
+++
+++        if ( decoder->top - stack >= CFF_MAX_OPERANDS )
+++          goto Stack_Overflow;
++ 
++       } /* general operator processing */
++ 
+--- freetype-2.3.11.orig/debian/patches-freetype/CVE-2010-2520.patch
++++ freetype-2.3.11/debian/patches-freetype/CVE-2010-2520.patch
+@@ -0,0 +1,19 @@
++Description: fix arbitrary code execution via invalid realloc
++Bug: http://savannah.nongnu.org/bugs/index.php?30361
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2.git/commit/?id=888cd1843e935fe675cf2ac303116d4ed5b9d54b
++
++Index: freetype-2.3.11/src/truetype/ttinterp.c
++===================================================================
++--- freetype-2.3.11.orig/src/truetype/ttinterp.c	2010-07-15 08:40:54.000000000 -0400
+++++ freetype-2.3.11/src/truetype/ttinterp.c	2010-07-15 08:41:03.000000000 -0400
++@@ -6466,8 +6466,8 @@
++       end_point   = CUR.pts.contours[contour] - CUR.pts.first_point;
++       first_point = point;
++ 
++-      if ( CUR.pts.n_points <= end_point )
++-        end_point = CUR.pts.n_points;
+++      if ( BOUNDS ( end_point, CUR.pts.n_points ) )
+++        end_point = CUR.pts.n_points - 1;
++ 
++       while ( point <= end_point && ( CUR.pts.tags[point] & mask ) == 0 )
++         point++;
+--- freetype-2.3.11.orig/debian/patches-freetype/CVE-2010-2500.patch
++++ freetype-2.3.11/debian/patches-freetype/CVE-2010-2500.patch
+@@ -0,0 +1,30 @@
++Description: fix arbitrary code execution via integer overflow
++Bug: http://savannah.nongnu.org/bugs/index.php?30263
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2.git/commit/?id=6305b869d86ff415a33576df6d43729673c66eee
++
++Index: freetype-2.3.11/src/smooth/ftgrays.c
++===================================================================
++--- freetype-2.3.11.orig/src/smooth/ftgrays.c	2010-07-15 08:36:29.000000000 -0400
+++++ freetype-2.3.11/src/smooth/ftgrays.c	2010-07-15 08:36:57.000000000 -0400
++@@ -1189,7 +1189,7 @@
++     /* first of all, compute the scanline offset */
++     p = (unsigned char*)map->buffer - y * map->pitch;
++     if ( map->pitch >= 0 )
++-      p += ( map->rows - 1 ) * map->pitch;
+++      p += (unsigned)( ( map->rows - 1 ) * map->pitch );
++ 
++     for ( ; count > 0; count--, spans++ )
++     {
++Index: freetype-2.3.11/src/smooth/ftsmooth.c
++===================================================================
++--- freetype-2.3.11.orig/src/smooth/ftsmooth.c	2010-07-15 08:36:38.000000000 -0400
+++++ freetype-2.3.11/src/smooth/ftsmooth.c	2010-07-15 08:36:57.000000000 -0400
++@@ -200,7 +200,7 @@
++ 
++     /* Required check is ( pitch * height < FT_ULONG_MAX ),     */
++     /* but we care realistic cases only. Always pitch <= width. */
++-    if ( width > 0xFFFFU || height > 0xFFFFU )
+++    if ( width > 0x7FFFU || height > 0x7FFFU )
++     {
++       FT_ERROR(( "ft_smooth_render_generic: glyph too large: %d x %d\n",
++                  width, height ));
+--- freetype-2.3.11.orig/debian/patches-freetype/freetype-bytecode-interpreter.patch
++++ freetype-2.3.11/debian/patches-freetype/freetype-bytecode-interpreter.patch
+@@ -0,0 +1,13 @@
++Index: include/freetype/config/ftoption.h
++===================================================================
++--- include/freetype/config/ftoption.h.orig	2007-07-07 01:14:19.000000000 -0700
+++++ include/freetype/config/ftoption.h	2007-07-07 01:14:21.000000000 -0700
++@@ -458,7 +458,7 @@
++   /*   Do not #undef this macro here, since the build system might         */
++   /*   define it for certain configurations only.                          */
++   /*                                                                       */
++-/* #define TT_CONFIG_OPTION_BYTECODE_INTERPRETER */
+++#define TT_CONFIG_OPTION_BYTECODE_INTERPRETER
++ 
++ 
++   /*************************************************************************/
+--- freetype-2.3.11.orig/debian/patches-freetype/CVE-2010-2519.patch
++++ freetype-2.3.11/debian/patches-freetype/CVE-2010-2519.patch
+@@ -0,0 +1,30 @@
++Description: fix arbitrary code execution via heap buffer overflow
++Bug: http://savannah.nongnu.org/bugs/index.php?30306
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2.git/commit/?id=5ef20c8c1d4de12a84b50ba497c2a358c90ec44b
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2.git/commit/?id=b2ea64bcc6c385a8e8318f9c759450a07df58b6d
++
++Index: freetype-2.3.11/src/base/ftobjs.c
++===================================================================
++--- freetype-2.3.11.orig/src/base/ftobjs.c	2010-07-15 08:39:55.000000000 -0400
+++++ freetype-2.3.11/src/base/ftobjs.c	2010-07-15 08:40:24.000000000 -0400
++@@ -1526,7 +1526,19 @@
++         goto Exit;
++       if ( FT_READ_USHORT( flags ) )
++         goto Exit;
++-      rlen -= 2;                    /* the flags are part of the resource */
+++      FT_TRACE3(( "POST fragment[%d]: offsets=0x%08x, rlen=0x%08x, flags=0x%04x\n",
+++                   i, offsets[i], rlen, flags ));
+++
+++      if ( ( flags >> 8 ) == 0 )        /* Comment, should not be loaded */
+++        continue;
+++
+++      /* the flags are part of the resource, so rlen >= 2.  */
+++      /* but some fonts declare rlen = 0 for empty fragment */
+++      if ( rlen > 2 )
+++        rlen -= 2;
+++      else
+++        rlen = 0;
+++
++       if ( ( flags >> 8 ) == type )
++         len += rlen;
++       else
+--- freetype-2.3.11.orig/debian/patches-freetype/freetype-bdflib-large-encodings.patch
++++ freetype-2.3.11/debian/patches-freetype/freetype-bdflib-large-encodings.patch
+@@ -0,0 +1,19 @@
++Index: src/bdf/bdflib.c
++===================================================================
++--- src/bdf/bdflib.c.orig	2007-07-07 01:14:17.000000000 -0700
+++++ src/bdf/bdflib.c	2007-07-07 01:14:29.000000000 -0700
++@@ -1578,6 +1578,14 @@
++         goto Exit;
++       }
++ 
+++      /* Check that the encoding is in the range [0, 65535] because       */
+++      /* otherwise p->have (a bitmap with static size) overflows.         */
+++      if ( p->glyph_enc >= sizeof(p->have) * 8 )
+++      {
+++	error = BDF_Err_Invalid_File_Format; /* Not the ideal error code */
+++	goto Exit;
+++      }
+++
++       /* Check to see whether this encoding has already been encountered. */
++       /* If it has then change it to unencoded so it gets added if        */
++       /* indicated.                                                       */
+--- freetype-2.3.11.orig/debian/patches-freetype/enable-subpixel-rendering.patch
++++ freetype-2.3.11/debian/patches-freetype/enable-subpixel-rendering.patch
+@@ -0,0 +1,11 @@
++--- freetype-2.2.1.orig/include/freetype/config/ftoption.h	2006-09-27 00:55:44.000000000 +0300
+++++ freetype-2.2.1/include/freetype/config/ftoption.h	2006-10-31 03:08:14.000000000 +0200
++@@ -92,7 +92,7 @@
++   /* This is done to allow FreeType clients to run unmodified, forcing     */
++   /* them to display normal gray-level anti-aliased glyphs.                */
++   /*                                                                       */
++-/* #define FT_CONFIG_OPTION_SUBPIXEL_RENDERING */
+++#define FT_CONFIG_OPTION_SUBPIXEL_RENDERING
++ 
++ 
++   /*************************************************************************/
+--- freetype-2.3.11.orig/debian/patches-freetype/CVE-2010-2806.patch
++++ freetype-2.3.11/debian/patches-freetype/CVE-2010-2806.patch
+@@ -0,0 +1,39 @@
++Description: fix possible arbitrary code execution via improper bounds checking
++Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/freetype/+bug/617019
++Bug: https://savannah.nongnu.org/bugs/?30656
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2.git/commit/?id=c06da1ad34663da7b6fc39b030dc3ae185b96557
++
++Index: freetype-2.3.11/src/type42/t42parse.c
++===================================================================
++--- freetype-2.3.11.orig/src/type42/t42parse.c	2010-08-13 08:22:28.000000000 -0400
+++++ freetype-2.3.11/src/type42/t42parse.c	2010-08-13 08:22:33.000000000 -0400
++@@ -575,6 +575,12 @@
++         }
++ 
++         string_size = T1_ToInt( parser );
+++        if ( string_size < 0 )
+++        {
+++          FT_ERROR(( "t42_parse_sfnts: invalid string size\n" ));
+++          error = T42_Err_Invalid_File_Format;
+++          goto Fail;
+++        }
++ 
++         T1_Skip_PS_Token( parser );             /* `RD' */
++         if ( parser->root.error )
++@@ -582,13 +588,14 @@
++ 
++         string_buf = parser->root.cursor + 1;   /* one space after `RD' */
++ 
++-        parser->root.cursor += string_size + 1;
++-        if ( parser->root.cursor >= limit )
+++        if ( limit - parser->root.cursor < string_size )
++         {
++           FT_ERROR(( "t42_parse_sfnts: too many binary data\n" ));
++           error = T42_Err_Invalid_File_Format;
++           goto Fail;
++         }
+++        else
+++          parser->root.cursor += string_size + 1;
++       }
++ 
++       if ( !string_buf )
+--- freetype-2.3.11.orig/debian/patches-freetype/331-hmtx-no-shorts.diff
++++ freetype-2.3.11/debian/patches-freetype/331-hmtx-no-shorts.diff
+@@ -0,0 +1,13 @@
++Index: freetype-2.3.5/src/sfnt/ttmtx.c
++===================================================================
++--- freetype-2.3.5.orig/src/sfnt/ttmtx.c	2007-07-07 01:14:16.000000000 -0700
+++++ freetype-2.3.5/src/sfnt/ttmtx.c	2007-07-07 01:14:35.000000000 -0700
++@@ -174,7 +174,7 @@
++     }
++ 
++     if ( FT_QNEW_ARRAY( *longs,  num_longs  ) ||
++-         FT_QNEW_ARRAY( *shorts, num_shorts ) )
+++         (num_shorts > 0 && FT_QNEW_ARRAY( *shorts, num_shorts ) ) )
++       goto Fail;
++ 
++     if ( FT_FRAME_ENTER( table_len ) )
+--- freetype-2.3.11.orig/debian/patches-freetype/bug30135.patch
++++ freetype-2.3.11/debian/patches-freetype/bug30135.patch
+@@ -0,0 +1,52 @@
++Description: fix denial of service via bdf font
++Ubuntu-Bug: https://bugs.launchpad.net/ubuntu/+source/freetype/+bug/617019
++Bug: https://savannah.nongnu.org/bugs/?30135
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2.git/commit/?id=f4c94d4b5f6b3e13415025ffa6fa07415d00104d
++
++Index: freetype-2.3.11/src/bdf/bdflib.c
++===================================================================
++--- freetype-2.3.11.orig/src/bdf/bdflib.c	2010-08-13 09:22:21.000000000 -0400
+++++ freetype-2.3.11/src/bdf/bdflib.c	2010-08-13 09:23:03.000000000 -0400
++@@ -470,6 +470,11 @@
++   }
++ 
++ 
+++  /* An empty string for empty fields. */
+++
+++  static const char  empty[1] = { 0 };      /* XXX eliminate this */
+++
+++
++   static char *
++   _bdf_list_join( _bdf_list_t*    list,
++                   int             c,
++@@ -494,18 +499,14 @@
++       if ( i + 1 < list->used )
++         dp[j++] = (char)c;
++     }
++-    dp[j] = 0;
+++    if ( dp != empty )
+++      dp[j] = 0;
++ 
++     *alen = j;
++     return dp;
++   }
++ 
++ 
++-  /* An empty string for empty fields. */
++-
++-  static const char  empty[1] = { 0 };      /* XXX eliminate this */
++-
++-
++   static FT_Error
++   _bdf_list_split( _bdf_list_t*   list,
++                    char*          separators,
++@@ -1875,6 +1876,9 @@
++     error = BDF_Err_Invalid_File_Format;
++ 
++   Exit:
+++    if ( error && ( p->flags & _BDF_GLYPH ) )
+++      FT_FREE( p->glyph_name );
+++
++     return error;
++   }
++ 
+--- freetype-2.3.11.orig/debian/patches-freetype/CVE-2010-2805.patch
++++ freetype-2.3.11/debian/patches-freetype/CVE-2010-2805.patch
+@@ -0,0 +1,18 @@
++Description: fix possible arbitrary code execution via improper bounds checking
++Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/freetype/+bug/617019
++Bug: https://savannah.nongnu.org/bugs/?30644
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2.git/commit/?id=45a3c76b547511fa9d97aca34b150a0663257375
++
++Index: freetype-2.3.11/src/base/ftstream.c
++===================================================================
++--- freetype-2.3.11.orig/src/base/ftstream.c	2010-08-13 08:21:49.000000000 -0400
+++++ freetype-2.3.11/src/base/ftstream.c	2010-08-13 08:21:59.000000000 -0400
++@@ -275,7 +275,7 @@
++     {
++       /* check current and new position */
++       if ( stream->pos >= stream->size        ||
++-           stream->pos + count > stream->size )
+++           stream->size - stream->pos < count )
++       {
++         FT_ERROR(( "FT_Stream_EnterFrame:"
++                    " invalid i/o; pos = 0x%lx, count = %lu, size = 0x%lx\n",
+--- freetype-2.3.11.orig/debian/patches-freetype/CVE-2010-2807.patch
++++ freetype-2.3.11/debian/patches-freetype/CVE-2010-2807.patch
+@@ -0,0 +1,272 @@
++Description: fix possible arbitrary code execution via improper type comparisons
++Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/freetype/+bug/617019
++Bug: https://savannah.nongnu.org/bugs/?30657
++Bug: https://savannah.nongnu.org/bugs/?30719
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2.git/commit/?id=346f1867fd32dae8f56e5b482d1af98f626804ac
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2.git/commit/?id=a205b3ca85d2d78aac71ea3c1df104972031d6ad
++
++Index: freetype-2.3.11/src/smooth/ftsmooth.c
++===================================================================
++--- freetype-2.3.11.orig/src/smooth/ftsmooth.c	2010-08-13 08:23:46.000000000 -0400
+++++ freetype-2.3.11/src/smooth/ftsmooth.c	2010-08-13 08:24:02.000000000 -0400
++@@ -140,8 +140,26 @@
++     cbox.xMax = FT_PIX_CEIL( cbox.xMax );
++     cbox.yMax = FT_PIX_CEIL( cbox.yMax );
++ 
++-    width  = (FT_UInt)( ( cbox.xMax - cbox.xMin ) >> 6 );
++-    height = (FT_UInt)( ( cbox.yMax - cbox.yMin ) >> 6 );
+++    if ( cbox.xMin < 0 && cbox.xMax > FT_INT_MAX + cbox.xMin )
+++    {
+++      FT_ERROR(( "ft_smooth_render_generic: glyph too large:"
+++                 " xMin = %d, xMax = %d\n",
+++                 cbox.xMin >> 6, cbox.xMax >> 6 ));
+++      return Smooth_Err_Raster_Overflow;
+++    }
+++    else
+++      width  = (FT_UInt)( ( cbox.xMax - cbox.xMin ) >> 6 );
+++
+++    if ( cbox.yMin < 0 && cbox.yMax > FT_INT_MAX + cbox.yMin )
+++    {
+++      FT_ERROR(( "ft_smooth_render_generic: glyph too large:"
+++                 " yMin = %d, yMax = %d\n",
+++                 cbox.yMin >> 6, cbox.yMax >> 6 ));
+++      return Smooth_Err_Raster_Overflow;
+++    }
+++    else
+++      height = (FT_UInt)( ( cbox.yMax - cbox.yMin ) >> 6 );
+++
++     bitmap = &slot->bitmap;
++     memory = render->root.memory;
++ 
++@@ -202,7 +220,7 @@
++     /* but we care realistic cases only. Always pitch <= width. */
++     if ( width > 0x7FFFU || height > 0x7FFFU )
++     {
++-      FT_ERROR(( "ft_smooth_render_generic: glyph too large: %d x %d\n",
+++      FT_ERROR(( "ft_smooth_render_generic: glyph too large: %u x %u\n",
++                  width, height ));
++       return Smooth_Err_Raster_Overflow;
++     }
++Index: freetype-2.3.11/src/truetype/ttinterp.c
++===================================================================
++--- freetype-2.3.11.orig/src/truetype/ttinterp.c	2010-08-13 08:23:23.000000000 -0400
+++++ freetype-2.3.11/src/truetype/ttinterp.c	2010-08-13 08:23:57.000000000 -0400
++@@ -223,9 +223,10 @@
++ 
++   /*************************************************************************/
++   /*                                                                       */
++-  /* A simple bounds-checking macro.                                       */
+++  /* Two simple bounds-checking macros.                                    */
++   /*                                                                       */
++-#define BOUNDS( x, n )  ( (FT_UInt)(x) >= (FT_UInt)(n) )
+++#define BOUNDS( x, n )   ( (FT_UInt)(x)  >= (FT_UInt)(n)  )
+++#define BOUNDSL( x, n )  ( (FT_ULong)(x) >= (FT_ULong)(n) )
++ 
++ #undef  SUCCESS
++ #define SUCCESS  0
++@@ -2992,39 +2993,39 @@
++     args[0] = FT_PIX_CEIL( args[0] );
++ 
++ 
++-#define DO_RS                          \
++-   {                                   \
++-     FT_ULong  I = (FT_ULong)args[0];  \
++-                                       \
++-                                       \
++-     if ( BOUNDS( I, CUR.storeSize ) ) \
++-     {                                 \
++-       if ( CUR.pedantic_hinting )     \
++-       {                               \
++-         ARRAY_BOUND_ERROR;            \
++-       }                               \
++-       else                            \
++-         args[0] = 0;                  \
++-     }                                 \
++-     else                              \
++-       args[0] = CUR.storage[I];       \
+++#define DO_RS                           \
+++   {                                    \
+++     FT_ULong  I = (FT_ULong)args[0];   \
+++                                        \
+++                                        \
+++     if ( BOUNDSL( I, CUR.storeSize ) ) \
+++     {                                  \
+++       if ( CUR.pedantic_hinting )      \
+++       {                                \
+++         ARRAY_BOUND_ERROR;             \
+++       }                                \
+++       else                             \
+++         args[0] = 0;                   \
+++     }                                  \
+++     else                               \
+++       args[0] = CUR.storage[I];        \
++    }
++ 
++ 
++-#define DO_WS                          \
++-   {                                   \
++-     FT_ULong  I = (FT_ULong)args[0];  \
++-                                       \
++-                                       \
++-     if ( BOUNDS( I, CUR.storeSize ) ) \
++-     {                                 \
++-       if ( CUR.pedantic_hinting )     \
++-       {                               \
++-         ARRAY_BOUND_ERROR;            \
++-       }                               \
++-     }                                 \
++-     else                              \
++-       CUR.storage[I] = args[1];       \
+++#define DO_WS                           \
+++   {                                    \
+++     FT_ULong  I = (FT_ULong)args[0];   \
+++                                        \
+++                                        \
+++     if ( BOUNDSL( I, CUR.storeSize ) ) \
+++     {                                  \
+++       if ( CUR.pedantic_hinting )      \
+++       {                                \
+++         ARRAY_BOUND_ERROR;             \
+++       }                                \
+++     }                                  \
+++     else                               \
+++       CUR.storage[I] = args[1];        \
++    }
++ 
++ 
++@@ -3033,7 +3034,7 @@
++      FT_ULong  I = (FT_ULong)args[0];    \
++                                          \
++                                          \
++-     if ( BOUNDS( I, CUR.cvtSize ) )     \
+++     if ( BOUNDSL( I, CUR.cvtSize ) )    \
++      {                                   \
++        if ( CUR.pedantic_hinting )       \
++        {                                 \
++@@ -3052,7 +3053,7 @@
++      FT_ULong  I = (FT_ULong)args[0];    \
++                                          \
++                                          \
++-     if ( BOUNDS( I, CUR.cvtSize ) )     \
+++     if ( BOUNDSL( I, CUR.cvtSize ) )    \
++      {                                   \
++        if ( CUR.pedantic_hinting )       \
++        {                                 \
++@@ -3069,7 +3070,7 @@
++      FT_ULong  I = (FT_ULong)args[0];                           \
++                                                                 \
++                                                                 \
++-     if ( BOUNDS( I, CUR.cvtSize ) )                            \
+++     if ( BOUNDSL( I, CUR.cvtSize ) )                           \
++      {                                                          \
++        if ( CUR.pedantic_hinting )                              \
++        {                                                        \
++@@ -4390,7 +4391,7 @@
++     /* first of all, check the index */
++ 
++     F = args[0];
++-    if ( BOUNDS( F, CUR.maxFunc + 1 ) )
+++    if ( BOUNDSL( F, CUR.maxFunc + 1 ) )
++       goto Fail;
++ 
++     /* Except for some old Apple fonts, all functions in a TrueType */
++@@ -4466,7 +4467,7 @@
++ 
++     /* first of all, check the index */
++     F = args[1];
++-    if ( BOUNDS( F, CUR.maxFunc + 1 ) )
+++    if ( BOUNDSL( F, CUR.maxFunc + 1 ) )
++       goto Fail;
++ 
++     /* Except for some old Apple fonts, all functions in a TrueType */
++@@ -4741,7 +4742,7 @@
++ 
++     L = (FT_ULong)args[0];
++ 
++-    if ( BOUNDS( L, CUR.zp2.n_points ) )
+++    if ( BOUNDSL( L, CUR.zp2.n_points ) )
++     {
++       if ( CUR.pedantic_hinting )
++       {
++@@ -4825,8 +4826,8 @@
++     K = (FT_UShort)args[1];
++     L = (FT_UShort)args[0];
++ 
++-    if( BOUNDS( L, CUR.zp0.n_points ) ||
++-        BOUNDS( K, CUR.zp1.n_points ) )
+++    if ( BOUNDS( L, CUR.zp0.n_points ) ||
+++         BOUNDS( K, CUR.zp1.n_points ) )
++     {
++       if ( CUR.pedantic_hinting )
++       {
++@@ -5480,12 +5481,12 @@
++   static void
++   Ins_SHZ( INS_ARG )
++   {
++-    TT_GlyphZoneRec zp;
++-    FT_UShort       refp;
++-    FT_F26Dot6      dx,
++-                    dy;
+++    TT_GlyphZoneRec  zp;
+++    FT_UShort        refp;
+++    FT_F26Dot6       dx,
+++                     dy;
++ 
++-    FT_UShort       last_point, i;
+++    FT_UShort        last_point, i;
++ 
++ 
++     if ( BOUNDS( args[0], 2 ) )
++@@ -5687,8 +5688,8 @@
++     cvtEntry = (FT_ULong)args[1];
++     point    = (FT_UShort)args[0];
++ 
++-    if ( BOUNDS( point,    CUR.zp0.n_points ) ||
++-         BOUNDS( cvtEntry, CUR.cvtSize )      )
+++    if ( BOUNDS( point,     CUR.zp0.n_points ) ||
+++         BOUNDSL( cvtEntry, CUR.cvtSize )      )
++     {
++       if ( CUR.pedantic_hinting )
++         CUR.error = TT_Err_Invalid_Reference;
++@@ -5880,7 +5881,7 @@
++     /* XXX: UNDOCUMENTED! cvt[-1] = 0 always */
++ 
++     if ( BOUNDS( point,      CUR.zp1.n_points ) ||
++-         BOUNDS( cvtEntry,   CUR.cvtSize + 1 )  ||
+++         BOUNDSL( cvtEntry,  CUR.cvtSize + 1 )  ||
++          BOUNDS( CUR.GS.rp0, CUR.zp0.n_points ) )
++     {
++       if ( CUR.pedantic_hinting )
++@@ -6131,8 +6132,8 @@
++     p1 = (FT_UShort)args[0];
++     p2 = (FT_UShort)args[1];
++ 
++-    if ( BOUNDS( args[0], CUR.zp1.n_points ) ||
++-         BOUNDS( args[1], CUR.zp0.n_points ) )
+++    if ( BOUNDS( p1, CUR.zp1.n_points ) ||
+++         BOUNDS( p2, CUR.zp0.n_points ) )
++     {
++       if ( CUR.pedantic_hinting )
++         CUR.error = TT_Err_Invalid_Reference;
++@@ -6661,7 +6662,7 @@
++       A = (FT_ULong)CUR.stack[CUR.args + 1];
++       B = CUR.stack[CUR.args];
++ 
++-      if ( BOUNDS( A, CUR.cvtSize ) )
+++      if ( BOUNDSL( A, CUR.cvtSize ) )
++       {
++         if ( CUR.pedantic_hinting )
++         {
++Index: freetype-2.3.11/src/truetype/ttinterp.h
++===================================================================
++--- freetype-2.3.11.orig/src/truetype/ttinterp.h	2010-08-13 08:23:31.000000000 -0400
+++++ freetype-2.3.11/src/truetype/ttinterp.h	2010-08-13 08:23:57.000000000 -0400
++@@ -150,7 +150,7 @@
++ 
++     FT_Bool            step_ins;  /* true if the interpreter must */
++                                   /* increment IP after ins. exec */
++-    FT_Long            cvtSize;
+++    FT_ULong           cvtSize;
++     FT_Long*           cvt;
++ 
++     FT_UInt            glyphSize; /* glyph instructions buffer size */
+--- freetype-2.3.11.orig/debian/patches-freetype/freetype-2.1.7-backwards.compat.patch
++++ freetype-2.3.11/debian/patches-freetype/freetype-2.1.7-backwards.compat.patch
+@@ -0,0 +1,35 @@
++Index: src/base/ftapi.c
++===================================================================
++--- src/base/ftapi.c.orig	2007-01-15 21:10:55.000000000 -0800
+++++ src/base/ftapi.c	2007-07-07 00:23:32.000000000 -0700
++@@ -118,4 +118,18 @@
++   }
++ 
++ 
+++  FT_BASE_DEF( FT_Short )
+++  FT_Get_Short( FT_Stream stream )
+++  {
+++    return FT_GET_SHORT();
+++  }
+++
+++
+++  FT_BASE_DEF( FT_Long )
+++  FT_Get_Long( FT_Stream stream )
+++  {
+++    return FT_GET_LONG();
+++  }
+++
+++
++ /* END */
++Index: src/base/ftbase.c
++===================================================================
++--- src/base/ftbase.c.orig	2007-02-07 22:38:01.000000000 -0800
+++++ src/base/ftbase.c	2007-07-07 00:25:05.000000000 -0700
++@@ -30,6 +30,7 @@
++ #include "ftstream.c"
++ #include "fttrigon.c"
++ #include "ftutil.c"
+++#include "ftapi.c"
++ 
++ #if defined( __APPLE__ ) && !defined ( DARWIN_NO_CARBON )
++ #include <ftmac.c>
+--- freetype-2.3.11.orig/debian/patches-freetype/enable-full-bytecode-interpreter
++++ freetype-2.3.11/debian/patches-freetype/enable-full-bytecode-interpreter
+@@ -0,0 +1,13 @@
++Index: freetype-2.3.5/include/freetype/config/ftoption.h
++===================================================================
++--- freetype-2.3.5.orig/include/freetype/config/ftoption.h	2007-07-07 01:14:27.000000000 -0700
+++++ freetype-2.3.5/include/freetype/config/ftoption.h	2007-07-07 01:14:42.000000000 -0700
++@@ -505,7 +505,7 @@
++   /*     ...                                                               */
++   /*   }                                                                   */
++   /*                                                                       */
++-#define TT_CONFIG_OPTION_UNPATENTED_HINTING
+++/* #define TT_CONFIG_OPTION_UNPATENTED_HINTING */
++ 
++ 
++   /*************************************************************************/
+--- freetype-2.3.11.orig/debian/patches-freetype/CVE-2010-2499.patch
++++ freetype-2.3.11/debian/patches-freetype/CVE-2010-2499.patch
+@@ -0,0 +1,47 @@
++Description: fix arbitrary code execution via buffer overflow
++Bug: http://savannah.nongnu.org/bugs/index.php?30248
++Bug: http://savannah.nongnu.org/bugs/index.php?30249
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2.git/commit/?id=c69891a1345640096fbf396e8dd567fe879ce233
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2.git/commit/?id=f29f741efbba0a5ce2f16464f648fb8d026ed4c8
++
++Index: freetype-2.3.11/src/base/ftobjs.c
++===================================================================
++--- freetype-2.3.11.orig/src/base/ftobjs.c	2010-07-15 08:32:54.000000000 -0400
+++++ freetype-2.3.11/src/base/ftobjs.c	2010-07-15 08:33:48.000000000 -0400
++@@ -1531,6 +1531,8 @@
++         len += rlen;
++       else
++       {
+++        if ( pfb_lenpos + 3 > pfb_len + 2 )
+++          goto Exit2;
++         pfb_data[pfb_lenpos    ] = (FT_Byte)( len );
++         pfb_data[pfb_lenpos + 1] = (FT_Byte)( len >> 8 );
++         pfb_data[pfb_lenpos + 2] = (FT_Byte)( len >> 16 );
++@@ -1539,6 +1541,8 @@
++         if ( ( flags >> 8 ) == 5 )      /* End of font mark */
++           break;
++ 
+++        if ( pfb_pos + 6 > pfb_len + 2 )
+++          goto Exit2;
++         pfb_data[pfb_pos++] = 0x80;
++ 
++         type = flags >> 8;
++@@ -1553,12 +1557,18 @@
++       }
++ 
++       error = FT_Stream_Read( stream, (FT_Byte *)pfb_data + pfb_pos, rlen );
+++      if ( error )
+++        goto Exit2;
++       pfb_pos += rlen;
++     }
++ 
+++    if ( pfb_pos + 2 > pfb_len + 2 )
+++      goto Exit2;
++     pfb_data[pfb_pos++] = 0x80;
++     pfb_data[pfb_pos++] = 3;
++ 
+++    if ( pfb_lenpos + 3 > pfb_len + 2 )
+++      goto Exit2;
++     pfb_data[pfb_lenpos    ] = (FT_Byte)( len );
++     pfb_data[pfb_lenpos + 1] = (FT_Byte)( len >> 8 );
++     pfb_data[pfb_lenpos + 2] = (FT_Byte)( len >> 16 );
+--- freetype-2.3.11.orig/debian/patches-freetype/uninitialized-vars.patch
++++ freetype-2.3.11/debian/patches-freetype/uninitialized-vars.patch
+@@ -0,0 +1,15 @@
++Index: freetype-2.3.11/src/pfr/pfrsbit.c
++===================================================================
++--- freetype-2.3.11.orig/src/pfr/pfrsbit.c
+++++ freetype-2.3.11/src/pfr/pfrsbit.c
++@@ -600,8 +600,8 @@
++ 
++     /* get the bitmap metrics */
++     {
++-      FT_Long   xpos, ypos, advance;
++-      FT_UInt   xsize, ysize, format;
+++      FT_Long   xpos = 0, ypos = 0, advance;
+++      FT_UInt   xsize = 0, ysize = 0, format = 0;
++       FT_Byte*  p;
++ 
++ 
+--- freetype-2.3.11.orig/debian/patches-freetype/CVE-2010-2808.patch
++++ freetype-2.3.11/debian/patches-freetype/CVE-2010-2808.patch
+@@ -0,0 +1,29 @@
++Description: fix possible arbitrary code execution via memory
++ corruption in Adobe Type 1 Mac Font File (LWFN) fonts
++Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/freetype/+bug/617019
++Bug: https://savannah.nongnu.org/bugs/?30658
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2.git/commit/?id=81f3472c0ba7b8f6466e2e214fa8c1c17fade975
++
++Index: freetype-2.3.11/src/base/ftobjs.c
++===================================================================
++--- freetype-2.3.11.orig/src/base/ftobjs.c	2010-08-13 08:24:24.000000000 -0400
+++++ freetype-2.3.11/src/base/ftobjs.c	2010-08-13 08:24:32.000000000 -0400
++@@ -1529,6 +1529,7 @@
++       FT_TRACE3(( "POST fragment[%d]: offsets=0x%08x, rlen=0x%08x, flags=0x%04x\n",
++                    i, offsets[i], rlen, flags ));
++ 
+++      /* postpone the check of rlen longer than buffer until FT_Stream_Read() */
++       if ( ( flags >> 8 ) == 0 )        /* Comment, should not be loaded */
++         continue;
++ 
++@@ -1568,6 +1569,10 @@
++         pfb_data[pfb_pos++] = 0;
++       }
++ 
+++      error = FT_Err_Cannot_Open_Resource;
+++      if ( pfb_pos > pfb_len || pfb_pos + rlen > pfb_len )
+++        goto Exit2;
+++
++       error = FT_Stream_Read( stream, (FT_Byte *)pfb_data + pfb_pos, rlen );
++       if ( error )
++         goto Exit2;
+--- freetype-2.3.11.orig/debian/patches-ft2demos/series
++++ freetype-2.3.11/debian/patches-ft2demos/series
+@@ -0,0 +1,5 @@
++ft2demos-2.1.7-ftbench.patch -p0
++ft2demos-2.1.7-no-rpath.patch -p0
++compiler_hardening_fixes.patch
++CVE-2010-2527.patch
++CVE-2010-2541.patch
+--- freetype-2.3.11.orig/debian/patches-ft2demos/ft2demos-2.1.7-no-rpath.patch
++++ freetype-2.3.11/debian/patches-ft2demos/ft2demos-2.1.7-no-rpath.patch
+@@ -0,0 +1,19 @@
++Index: graph/x11/rules.mk
++===================================================================
++--- graph/x11/rules.mk.orig	2003-06-16 01:37:10.000000000 -0700
+++++ graph/x11/rules.mk	2006-03-05 11:57:36.000000000 -0800
++@@ -67,9 +67,11 @@
++   # The GRAPH_LINK variable is expanded each time an executable is linked
++   # against the graphics library.
++   #
++-  ifeq ($(PLATFORM),unix)
++-    GRAPH_LINK += $(X11_LIB:%=-R%)
++-  endif
+++  # No, we do not want rpath on Debian; reversing YAMANO-UCHI Hidetoshi's
+++  # 2003-06-13 change.  (Anthony Fok, 2003-08-28)
+++  #ifeq ($(PLATFORM),unix)
+++  #  GRAPH_LINK += $(X11_LIB:%=-R%)
+++  #endif
++   GRAPH_LINK += $(X11_LIB:%=-L%) -lX11
++ 
++   # Solaris needs a -lsocket in GRAPH_LINK.
+--- freetype-2.3.11.orig/debian/patches-ft2demos/CVE-2010-2541.patch
++++ freetype-2.3.11/debian/patches-ft2demos/CVE-2010-2541.patch
+@@ -0,0 +1,30 @@
++Description: fix possible arbitrary code execution via buffer overflow
++ in the ftmulti demo program
++Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/freetype/+bug/617019
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2-demos.git/commit/?id=3636982a7666bcfa0e47fb31d565314d1b3e7d78
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2-demos.git/commit/?id=b4d857b39fb4fcc20b5fa5cf03fde61a4919eb46
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2-demos.git/commit/?id=8dceb1f3f5a821ad1e8d6d53c323f4336e619ff4
++
++Index: ft2demos-2.3.11/src/ftmulti.c
++===================================================================
++--- ft2demos-2.3.11.orig/src/ftmulti.c	2010-08-13 08:25:38.000000000 -0400
+++++ ft2demos-2.3.11/src/ftmulti.c	2010-08-13 08:26:13.000000000 -0400
++@@ -813,13 +813,14 @@
++ 
++           for ( n = 0; n < (int)multimaster->num_axis; n++ )
++           {
++-            char  temp[32];
+++            char  temp[100];
++ 
++ 
++-            sprintf( temp, "  %s:%g",
+++            sprintf( temp, "  %.50s:%g",
++                            multimaster->axis[n].name,
++-                           design_pos[n]/65536. );
++-            strcat( Header, temp );
+++                           design_pos[n] / 65536.0 );
+++            strncat( Header, temp,
+++                     sizeof ( Header ) - strlen( Header ) - 1 );
++           }
++         }
++         grWriteCellString( &bit, 0, 16, Header, fore_color );
+--- freetype-2.3.11.orig/debian/patches-ft2demos/compiler_hardening_fixes.patch
++++ freetype-2.3.11/debian/patches-ft2demos/compiler_hardening_fixes.patch
+@@ -0,0 +1,49 @@
++Index: ft2demos-2.3.9/src/ftcommon.c
++===================================================================
++--- ft2demos-2.3.9.orig/src/ftcommon.c
+++++ ft2demos-2.3.9/src/ftcommon.c
++@@ -445,6 +445,7 @@
++ 
++         if ( file == NULL )  /* shouldn't happen */
++         {
+++          free( (void *)font->filepathname );
++           free( font );
++           return FT_Err_Invalid_Argument;
++         }
++@@ -454,7 +455,15 @@
++         fseek( file, 0, SEEK_SET );
++ 
++         font->file_address = malloc( file_size );
++-        fread( font->file_address, 1, file_size, file );
+++
+++        if (fread( font->file_address, 1, file_size, file ) < file_size)
+++        {
+++          fclose( file );
+++          free( font->file_address );
+++          free( (void *)font->filepathname );
+++          free( font );
+++          return FT_Err_Invalid_Argument;
+++        }
++ 
++         font->file_size    = file_size;
++ 
++Index: ft2demos-2.3.9/src/ftdiff.c
++===================================================================
++--- ft2demos-2.3.9.orig/src/ftdiff.c
+++++ ft2demos-2.3.9/src/ftdiff.c
++@@ -1138,8 +1138,13 @@
++ 
++         if ( text != NULL )
++         {
++-          fread( text, tsize, 1, tfile );
++-          text[tsize] = 0;
+++          if (fread( text, tsize, 1, tfile ) < 1) {
+++            fprintf( stderr, "could not read '%s'\n", textfile );
+++            free( text );
+++            text = (unsigned char *)default_text;
+++          } else {
+++            text[tsize] = 0;
+++          }
++         }
++         else
++         {
+--- freetype-2.3.11.orig/debian/patches-ft2demos/ft2demos-2.1.7-ftbench.patch
++++ freetype-2.3.11/debian/patches-ft2demos/ft2demos-2.1.7-ftbench.patch
+@@ -0,0 +1,113 @@
++Index: src/ftbench.c
++===================================================================
++--- src/ftbench.c.orig	2006-05-13 13:49:48.000000000 -0700
+++++ src/ftbench.c	2006-05-13 13:56:03.000000000 -0700
++@@ -70,6 +70,7 @@
++ FTC_ImageCache    image_cache;
++ FTC_SBitCache     sbit_cache;
++ FTC_ImageTypeRec  font_type;
+++FT_UInt           num_charcodes;
++ 
++ enum {
++   FT_BENCH_LOAD_GLYPH,
++@@ -209,7 +210,7 @@
++ 
++   TIMER_START( timer );
++ 
++-  for ( i = 0; i < face->num_glyphs; i++ )
+++  for ( i = 0; i < num_charcodes; i++ )
++   {
++     if ( !FT_Load_Glyph( face, i, load_flags ) )
++       done++;
++@@ -231,7 +232,7 @@
++ 
++   FT_UNUSED( user_data );
++ 
++-  for ( i = 0; i < face->num_glyphs; i++ )
+++  for ( i = 0; i < num_charcodes; i++ )
++   {
++     if ( FT_Load_Glyph( face, i, load_flags ) )
++       continue;
++@@ -257,7 +258,7 @@
++ 
++   FT_UNUSED( user_data );
++ 
++-  for ( i = 0; i < face->num_glyphs; i++ )
+++  for ( i = 0; i < num_charcodes; i++ )
++   {
++     if ( FT_Load_Glyph( face, i, load_flags ) )
++       continue;
++@@ -287,7 +288,7 @@
++ 
++   FT_UNUSED( user_data );
++ 
++-  for ( i = 0; i < face->num_glyphs; i++ )
+++  for ( i = 0; i < num_charcodes; i++ )
++   {
++     if ( FT_Load_Glyph( face, i, load_flags ) )
++       continue;
++@@ -380,7 +381,7 @@
++ 
++   TIMER_START( timer );
++ 
++-  for ( i = 0; i < face->num_glyphs; i++ )
+++  for ( i = 0; i < num_charcodes; i++ )
++   {
++     if ( !FTC_ImageCache_Lookup(image_cache, &font_type, i, &glyph, NULL) )
++       done++;
++@@ -411,7 +412,7 @@
++ 
++   TIMER_START( timer );
++ 
++-  for ( i = 0; i < face->num_glyphs; i++ )
+++  for ( i = 0; i < num_charcodes; i++ )
++   {
++     if ( !FTC_SBitCache_Lookup(sbit_cache, &font_type, i, &glyph, NULL) )
++       done++;
++@@ -481,19 +482,24 @@
++   int i;
++ 
++ 
++-  charset->code = (FT_ULong*)calloc( face->num_glyphs, sizeof( FT_ULong ) );
++-  if ( !charset->code )
++-    return;
++-
++   if ( face->charmap )
++   {
++-    i = 0;
+++    /* A glyph may have multiple cmap entries in some fonts such that	*/
+++    /* the num_charcodes may be greater than face->num_glyphs.		*/
+++    /* To be safe, count num_charcodes before calling calloc.		*/
+++    num_charcodes = 0;
++     charcode = FT_Get_First_Char(face, &gindex);
+++    while ( gindex )
+++    {
+++      num_charcodes++;
+++      charcode = FT_Get_Next_Char(face, charcode, &gindex);
+++    }
++ 
++-    /* certain fonts contain a broken charmap that will map character codes */
++-    /* to out-of-bounds glyph indices. Take care of that here !!            */
++-    /*                                                                      */
++-    while ( gindex && i < face->num_glyphs )
+++    charset->code = (FT_ULong*)calloc(num_charcodes, sizeof( FT_ULong ));
+++
+++    i = 0;
+++    charcode = FT_Get_First_Char(face, &gindex);
+++    while ( gindex )
++     {
++       charset->code[i++] = charcode;
++       charcode = FT_Get_Next_Char(face, charcode, &gindex);
++@@ -503,7 +509,11 @@
++   else
++   {
++     /* no charmap, do an identity mapping */
++-    for ( i = 0; i < face->num_glyphs; i++ )
+++    num_charcodes = face->num_glyphs;
+++
+++    charset->code = (FT_ULong*)calloc(num_charcodes, sizeof( FT_ULong ));
+++
+++    for ( i = 0; i < num_charcodes; i++ )
++       charset->code[i] = i;
++   }
++ 
+--- freetype-2.3.11.orig/debian/patches-ft2demos/ft2demos-broken-internal-includes.patch
++++ freetype-2.3.11/debian/patches-ft2demos/ft2demos-broken-internal-includes.patch
+@@ -0,0 +1,41 @@
++Index: src/ftcommon.i
++===================================================================
++--- src/ftcommon.i.orig	2005-05-26 22:49:41.000000000 -0700
+++++ src/ftcommon.i	2006-03-05 11:54:24.000000000 -0800
++@@ -21,9 +21,6 @@
++ #include FT_BITMAP_H
++ #include FT_SYNTHESIS_H
++ 
++-  /* the following header shouldn't be used in normal programs */
++-#include FT_INTERNAL_DEBUG_H
++-
++ #include "common.h"
++ 
++ #include <stdio.h>
++Index: src/ftdump.c
++===================================================================
++--- src/ftdump.c.orig	2004-05-10 13:54:54.000000000 -0700
+++++ src/ftdump.c	2006-03-05 11:54:24.000000000 -0800
++@@ -13,7 +13,8 @@
++ #include FT_SFNT_NAMES_H
++ #include FT_TRUETYPE_IDS_H
++ 
++-  /* the following header shouldn't be used in normal programs */
+++  /* the following headers shouldn't be used in normal programs */
+++#include "freetype/internal/internal.h"
++ #include FT_INTERNAL_DEBUG_H
++ 
++   /* showing driver name */
++Index: src/ftvalid.c
++===================================================================
++--- src/ftvalid.c.orig	2005-05-23 13:42:39.000000000 -0700
+++++ src/ftvalid.c	2006-03-05 11:54:24.000000000 -0800
++@@ -17,6 +17,8 @@
++ #include <ft2build.h>
++ 
++ #include FT_FREETYPE_H
+++/* XXX: these are internal headers and should never be used */
+++#include "freetype/internal/internal.h"
++ #include FT_INTERNAL_DEBUG_H
++ #include FT_INTERNAL_VALIDATE_H
++ #include FT_TRUETYPE_TABLES_H
+--- freetype-2.3.11.orig/debian/patches-ft2demos/CVE-2010-2527.patch
++++ freetype-2.3.11/debian/patches-ft2demos/CVE-2010-2527.patch
+@@ -0,0 +1,141 @@
++Description: fix arbitrary code execution via buffer overflows
++Bug: http://savannah.nongnu.org/bugs/index.php?30054
++Origin: upstream, http://git.savannah.gnu.org/cgit/freetype/freetype2-demos.git/commit/?id=b995299b73ba4cd259f221f500d4e63095508bec
++
++Index: ft2demos-2.3.11/src/ftdiff.c
++===================================================================
++--- ft2demos-2.3.11.orig/src/ftdiff.c	2010-07-15 08:44:35.000000000 -0400
+++++ ft2demos-2.3.11/src/ftdiff.c	2010-07-15 08:45:52.000000000 -0400
++@@ -1054,11 +1054,11 @@
++ 
++       state->message = state->message0;
++       if ( total > 1 )
++-        sprintf( state->message0, "%s %d/%d @ %5.1fpt",
+++        sprintf( state->message0, "%.100s %d/%d @ %5.1fpt",
++                  state->filename, idx + 1, total,
++                  state->char_size );
++       else
++-        sprintf( state->message0, "%s @ %5.1fpt",
+++        sprintf( state->message0, "%.100s @ %5.1fpt",
++                  state->filename,
++                  state->char_size );
++     }
++Index: ft2demos-2.3.11/src/ftgrid.c
++===================================================================
++--- ft2demos-2.3.11.orig/src/ftgrid.c	2010-07-15 08:44:40.000000000 -0400
+++++ ft2demos-2.3.11/src/ftgrid.c	2010-07-15 08:45:52.000000000 -0400
++@@ -787,22 +787,22 @@
++       switch ( error_code )
++       {
++       case FT_Err_Ok:
++-        sprintf( status.header_buffer, "%s %s (file `%s')",
+++        sprintf( status.header_buffer, "%.50s %.50s (file `%.100s')",
++                  face->family_name, face->style_name, basename );
++         break;
++ 
++       case FT_Err_Invalid_Pixel_Size:
++-        sprintf( status.header_buffer, "Invalid pixel size (file `%s')",
+++        sprintf( status.header_buffer, "Invalid pixel size (file `%.100s')",
++                  basename );
++         break;
++ 
++       case FT_Err_Invalid_PPem:
++-        sprintf( status.header_buffer, "Invalid ppem value (file `%s')",
+++        sprintf( status.header_buffer, "Invalid ppem value (file `%.100s')",
++                  basename );
++         break;
++ 
++       default:
++-        sprintf( status.header_buffer, "File `%s': error 0x%04x",
+++        sprintf( status.header_buffer, "File `%.100s': error 0x%04x",
++                  basename, (FT_UShort)error_code );
++         break;
++       }
++Index: ft2demos-2.3.11/src/ftmulti.c
++===================================================================
++--- ft2demos-2.3.11.orig/src/ftmulti.c	2010-07-15 08:44:45.000000000 -0400
+++++ ft2demos-2.3.11/src/ftmulti.c	2010-07-15 08:45:52.000000000 -0400
++@@ -34,7 +34,7 @@
++ 
++ #define  MAXPTSIZE  500                 /* dtp */
++ 
++-  char  Header[128];
+++  char  Header[256];
++   char* new_header = 0;
++ 
++   const unsigned char*  Text = (unsigned char*)
++@@ -795,7 +795,7 @@
++           Render_All( Num, ptsize );
++         }
++ 
++-        sprintf( Header, "%s %s (file %s)",
+++        sprintf( Header, "%.50s %.50s (file %.100s)",
++                          face->family_name,
++                          face->style_name,
++                          ft_basename( argv[file] ) );
++@@ -830,7 +830,7 @@
++       }
++       else
++       {
++-        sprintf( Header, "%s: not an MM font file, or could not be opened",
+++        sprintf( Header, "%.100s: not an MM font file, or could not be opened",
++                          ft_basename( argv[file] ) );
++       }
++ 
++Index: ft2demos-2.3.11/src/ftstring.c
++===================================================================
++--- ft2demos-2.3.11.orig/src/ftstring.c	2010-07-15 08:44:48.000000000 -0400
+++++ ft2demos-2.3.11/src/ftstring.c	2010-07-15 08:45:52.000000000 -0400
++@@ -413,19 +413,20 @@
++       switch ( error_code )
++       {
++       case FT_Err_Ok:
++-        sprintf( status.header_buffer, "%s %s (file `%s')", face->family_name,
+++        sprintf( status.header_buffer,
+++                 "%.50s %.50s (file `%.100s')", face->family_name,
++                  face->style_name, basename );
++         break;
++       case FT_Err_Invalid_Pixel_Size:
++-        sprintf( status.header_buffer, "Invalid pixel size (file `%s')",
+++        sprintf( status.header_buffer, "Invalid pixel size (file `%.100s')",
++                  basename );
++         break;
++       case FT_Err_Invalid_PPem:
++-        sprintf( status.header_buffer, "Invalid ppem value (file `%s')",
+++        sprintf( status.header_buffer, "Invalid ppem value (file `%.100s')",
++                  basename );
++         break;
++       default:
++-        sprintf( status.header_buffer, "File `%s': error 0x%04x", basename,
+++        sprintf( status.header_buffer, "File `%.100s': error 0x%04x", basename,
++             (FT_UShort)error_code );
++         break;
++       }
++Index: ft2demos-2.3.11/src/ftview.c
++===================================================================
++--- ft2demos-2.3.11.orig/src/ftview.c	2010-07-15 08:44:53.000000000 -0400
+++++ ft2demos-2.3.11/src/ftview.c	2010-07-15 08:45:52.000000000 -0400
++@@ -1086,19 +1086,19 @@
++       switch ( error_code )
++       {
++       case FT_Err_Ok:
++-        sprintf( status.header_buffer, "%s %s (file `%s')",
+++        sprintf( status.header_buffer, "%.50s %.50s (file `%.100s')",
++                  face->family_name, face->style_name, basename );
++         break;
++       case FT_Err_Invalid_Pixel_Size:
++-        sprintf( status.header_buffer, "Invalid pixel size (file `%s')",
+++        sprintf( status.header_buffer, "Invalid pixel size (file `%.100s')",
++                  basename );
++         break;
++       case FT_Err_Invalid_PPem:
++-        sprintf( status.header_buffer, "Invalid ppem value (file `%s')",
+++        sprintf( status.header_buffer, "Invalid ppem value (file `%.100s')",
++                  basename );
++         break;
++       default:
++-        sprintf( status.header_buffer, "File `%s': error 0x%04x",
+++        sprintf( status.header_buffer, "File `%.100s': error 0x%04x",
++                  basename, (FT_UShort)error_code );
++         break;
++       }
+--- freetype-2.3.11.orig/debian/patches-ft2demos/ft2demos-ftview-wrong-types
++++ freetype-2.3.11/debian/patches-ft2demos/ft2demos-ftview-wrong-types
+@@ -0,0 +1,47 @@
++Index: ft2demos-2.1.10/src/ftview.c
++===================================================================
++--- ft2demos-2.1.10.orig/src/ftview.c	2005-05-25 11:31:14.000000000 -0700
+++++ ft2demos-2.1.10/src/ftview.c	2006-04-28 01:44:44.000000000 -0700
++@@ -865,10 +865,6 @@
++         debug = 1;
++         break;
++ 
++-      case 'D':
++-        dump_cache_stats = 1;
++-        break;
++-
++       case 'e':
++         encoding = (FT_Encoding)make_tag( optarg );
++         break;
++@@ -1053,19 +1049,6 @@
++       grWriteCellString( &bit, 0, 8, Header, fore_color );
++       grRefreshSurface( surface );
++ 
++-      if ( dump_cache_stats )
++-      {
++-        /* dump simple cache manager statistics */
++-        fprintf( stderr, "cache manager [ nodes, bytes, average ] = "
++-                         " [ %d, %ld, %f ]\n",
++-                         cache_manager->num_nodes,
++-                         cache_manager->cur_weight,
++-                         cache_manager->num_nodes > 0
++-                           ? cache_manager->cur_weight * 1.0 /
++-                               cache_manager->num_nodes
++-                           : 0.0 );
++-      }
++-
++       grListenSurface( surface, 0, &event );
++       if ( !( key = Process_Event( &event ) ) )
++         goto End;
++Index: ft2demos-2.1.10/src/ftcommon.i
++===================================================================
++--- ft2demos-2.1.10.orig/src/ftcommon.i	2006-04-27 23:46:09.000000000 -0700
+++++ ft2demos-2.1.10/src/ftcommon.i	2006-04-28 01:45:41.000000000 -0700
++@@ -186,7 +186,6 @@
++ 
++   FTC_ImageTypeRec  current_font;
++ 
++-  int  dump_cache_stats = 0;  /* do we need to dump cache statistics? */
++   int  use_sbits_cache  = 1;
++ 
++   int  num_indices;           /* number of glyphs or characters */
+--- freetype-2.3.11.orig/.pc/.version
++++ freetype-2.3.11/.pc/.version
+@@ -0,0 +1 @@
++2

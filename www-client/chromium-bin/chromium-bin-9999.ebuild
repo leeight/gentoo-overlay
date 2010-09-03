@@ -121,7 +121,7 @@ src_install() {
 	make_wrapper chromium-bin ./chrome ${CHROMIUM_HOME}/chrome-linux ${CHROMIUM_HOME}/nss-nspr:${CHROMIUM_HOME}/chrome-linux
 	newicon "${FILESDIR}"/chromium.png ${PN}.png
 	make_desktop_entry chromium-bin "Chromium (bin)" ${PN} "Network;WebBrowser" "StartupWMClass=Chrome"
-	sed -e "/^Exec/s/$/ --enable-plugins --enable-sync --enable-tabbed-options --enable-extension-timeline-api %U/" -i "${D}"/usr/share/applications/*.desktop \
+	sed -e "/^Exec/s/$/ --enable-plugins --enable-sync --enable-tabbed-options --enable-extension-timeline-api --enable-accelerated-compositing %U/" -i "${D}"/usr/share/applications/*.desktop \
 		|| die "desktop file sed failed"
 }
 

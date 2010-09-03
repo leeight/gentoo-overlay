@@ -37,7 +37,7 @@ pkg_setup() {
 }
 src_prepare() {
 	if use ubuntu; then
-		epatch "${FILESDIR}"/${P}-ubuntu.patch
+		epatch "${FILESDIR}/xft_2.1.14-1ubuntu1.diff"
 	fi
 }
 
